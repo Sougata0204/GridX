@@ -75,6 +75,12 @@ module gvf_divergent_test;
     endtask
 
     initial begin
+        $display("[GRIDX3_CONFIG] Core Clock Frequency: %0d MHz (%0d ps period)", gridx_config_pkg::CFG_CORE_FREQ_MHZ, gridx_config_pkg::CFG_CORE_PERIOD_PS);
+        $display("[GRIDX3_CONFIG] TSV Bundle Width: %0d bits", gridx_config_pkg::CFG_TSV_DATA_WIDTH);
+        $display("[GRIDX3_CONFIG] TSV Bundles per Core Column: %0d", gridx_config_pkg::CFG_TSV_BUNDLES_PER_CORE);
+        $display("[GRIDX3_CONFIG] TSV Aggregate Bits per Cycle: %0d bits/cycle (%0d Bytes/cycle)", gridx_config_pkg::CFG_TSV_AGGREGATE_BW, gridx_config_pkg::CFG_TSV_AGGREGATE_BW/8);
+        $display("[GRIDX3_CONFIG] Calculated Vertical Bandwidth: %0d GB/s (6.144 TB/s)", (gridx_config_pkg::CFG_TSV_AGGREGATE_BW / 8) * (gridx_config_pkg::CFG_CORE_FREQ_MHZ / 1000));
+        $display("[GRIDX3_CONFIG] NoC Flit Width (Row Direction): %0d bits", gridx_config_pkg::CFG_NOC_FLIT_WIDTH);
         $display("=== DIVERGENT BRANCH TEST: 4 threads, 1 block, 1 core ===");
         rst_n = 0; repeat(20) @(posedge clk); rst_n = 1; repeat(5) @(posedge clk);
 
