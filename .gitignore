@@ -1,0 +1,32 @@
+# Vivado project files
+*.cache/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.xpr
+sim_project/
+vivado_output/
+xsim_work/
+xsim.dir/
+.Xil/
+
+# Simulation logs (large)
+*.log
+*.wdb
+*.vcd
+*.pb
+*.jou
+*.dll
+
+# Temp files
+*.backup.*
+dfx_runtime.txt
+fix_7071.py
+warnings_*.txt
+parsed_warnings.log
+linter_warnings.log
+
+# OS
+Thumbs.db
+.DS_Store
