@@ -16,9 +16,7 @@ import re
 import os
 from collections import OrderedDict
 
-# ===========================================================================
 # CONSTANTS — from gridx_mem_pkg.sv and gridx_pkg.sv
-# ===========================================================================
 FLIT_WIDTH_BITS      = 256      # gridx_mem_pkg::FLIT_WIDTH
 NOC_FREQ_MHZ         = 1000     # gridx_mem_pkg::NOC_FREQ_MHZ
 LINK_BW_GBPS         = 256      # gridx_mem_pkg::LINK_BW_GBPS
@@ -183,9 +181,7 @@ def main():
     print(f"  Parsed {len(results_2d)} suites from 2D log")
     print()
 
-    # ======================================================================
     # 1. THEORETICAL TOPOLOGY ANALYSIS
-    # ======================================================================
     print_separator()
     print("  SECTION 1: Theoretical Topology Analysis")
     print_separator()
@@ -230,9 +226,7 @@ def main():
     print("  → At high ρ (BW-bound): 3D wins (2× bisection absorbs traffic)")
     print()
 
-    # ======================================================================
     # 2. PER-KERNEL COMPARISON TABLE
-    # ======================================================================
     print_separator()
     print("  SECTION 2: Per-Kernel Empirical Comparison")
     print_separator()
@@ -266,9 +260,7 @@ def main():
 
     print()
 
-    # ======================================================================
     # 3. BANDWIDTH ANALYSIS
-    # ======================================================================
     print_separator()
     print("  SECTION 3: Effective Bandwidth Analysis")
     print(f"  (at assumed clock = {SIM_CLK_FREQ_HZ/1e6:.0f} MHz — pre-synthesis)")
@@ -295,9 +287,7 @@ def main():
 
     print()
 
-    # ======================================================================
     # 4. BISECTION BANDWIDTH VALIDATION
-    # ======================================================================
     print_separator()
     print("  SECTION 4: Bisection Bandwidth — Theory vs Measured")
     print_separator()
@@ -344,9 +334,7 @@ def main():
     print(f"  └────────────────────────────────────────────────────────────┘")
     print()
 
-    # ======================================================================
     # 5. DIAGNOSTIC FLAGS
-    # ======================================================================
     print_separator()
     print("  SECTION 5: Diagnostic Observations")
     print_separator()

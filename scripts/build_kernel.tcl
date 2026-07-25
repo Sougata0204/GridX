@@ -1,9 +1,6 @@
-# ============================================================================
 # GridX³ Kernel — Vivado Non-Project (Batch) TCL Flow
-# ============================================================================
 # Usage: vivado -mode batch -source scripts/build_kernel.tcl
 # Runs: read sources → synthesis → implementation → bitstream
-# ============================================================================
 
 set SCRIPT_DIR   [file normalize [file dirname [info script]]]
 set PROJECT_ROOT [file normalize [file join $SCRIPT_DIR ..]]
@@ -102,11 +99,9 @@ set SRC_FILES [list \
 ]
 
 # ---- Read Sources ----
-puts "=========================================="
 puts " GridX³ Kernel — Vivado Batch Build"
 puts " Top: $TOP_MODULE"
 puts " Part: $PART"
-puts "=========================================="
 
 read_verilog -sv $SRC_FILES
 read_xdc [file join $PROJECT_ROOT constraints gridx_kernel_top.xdc]
@@ -140,7 +135,5 @@ report_power -file $OUTPUT_DIR/power.rpt
 puts "\n>>> Generating Bitstream..."
 write_bitstream -force $OUTPUT_DIR/${TOP_MODULE}.bit
 
-puts "\n=========================================="
 puts " BUILD COMPLETE"
 puts " Bitstream: $OUTPUT_DIR/${TOP_MODULE}.bit"
-puts "=========================================="

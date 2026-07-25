@@ -1,9 +1,6 @@
-# ============================================================================
 # GridX³ — V2 Simulation Script
-# ============================================================================
 # Compiles DPI-C memory backend, elaborates the design, and runs simulation.
 # Note: Memory efficient execution flow.
-# ============================================================================
 
 set PROJECT_DIR "d:/ML_DL_AI/GridX_Vivado/GridX"
 set SRC_DIR "$PROJECT_DIR/src"

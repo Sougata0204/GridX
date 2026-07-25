@@ -1,10 +1,7 @@
-# ============================================================================
 # GridX3 -- Vivado/XSim compile and run flow
-# ============================================================================
 # Usage:
 #   vivado -mode batch -source scripts/compile_xsim.tcl
 #   vivado -mode batch -source scripts/compile_xsim.tcl -tclargs <top> [run]
-# ============================================================================
 
 set SCRIPT_DIR   [file normalize [file dirname [info script]]]
 set PROJECT_ROOT [file normalize [file join $SCRIPT_DIR ..]]
@@ -93,13 +90,11 @@ if {[file exists $top_tb]} {
     }
 }
 
-puts "=========================================="
 puts " GridX3 Vivado/XSim Compile"
 puts " Root: $PROJECT_ROOT"
 puts " Work: $WORK_DIR"
 puts " Top:  $TOP_MODULE"
 puts " Files: [llength $files]"
-puts "=========================================="
 
 puts "\n>>> Running xvlog..."
 set xvlog_base [list xvlog -sv -work xil_defaultlib -d DEBUG -i $SRC_DIR -i $MESH_SRC_DIR]
@@ -145,7 +140,5 @@ if {$RUN_SIM} {
     puts $result
 }
 
-puts "\n=========================================="
 puts " XSIM FLOW COMPLETE"
 puts " Snapshot: $TOP_MODULE"
-puts "=========================================="

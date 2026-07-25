@@ -23,9 +23,7 @@ import re
 import sys
 from collections import defaultdict
 
-# ============================================================================
 # VCD STREAMING PARSER (Low Memory)
-# ============================================================================
 class VCDStreamParser:
     """Parses VCD files line by line without loading the entire file."""
 
@@ -104,9 +102,7 @@ class VCDStreamParser:
                                 yield (current_time, sig_id, value)
 
 
-# ============================================================================
 # ANALYSIS FUNCTIONS
-# ============================================================================
 
 def analyze_core_utilization(parser, num_cores=8):
     """Compute per-core active vs stalled vs idle percentages."""
@@ -235,9 +231,7 @@ def generate_csv(core_stats, mem_traffic, output_dir):
     print(f"[Analyzer] Memory CSV: {csv_path2}")
 
 
-# ============================================================================
 # ASCII HEATMAP (no matplotlib dependency)
-# ============================================================================
 def print_ascii_heatmap(core_stats):
     """Print a simple ASCII heatmap of core utilization."""
     print("\n" + "=" * 60)
@@ -255,9 +249,7 @@ def print_ascii_heatmap(core_stats):
     print()
 
 
-# ============================================================================
 # MAIN
-# ============================================================================
 def main():
     parser_arg = argparse.ArgumentParser(description="GridX³ VCD Performance Analyzer")
     parser_arg.add_argument("vcd_file", help="Path to VCD file")

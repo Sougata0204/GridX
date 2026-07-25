@@ -1,9 +1,6 @@
-# ============================================================================
 # GridX³ — Vivado Elaboration-Only Lint Check (ASIC)
-# ============================================================================
 # Usage: vivado -mode batch -source scripts/lint_check.tcl
 # Just reads + elaborates. No synthesis, no FPGA, no bitstream.
-# ============================================================================
 
 set SCRIPT_DIR   [file normalize [file dirname [info script]]]
 set PROJECT_ROOT [file normalize [file join $SCRIPT_DIR ..]]
@@ -97,11 +94,9 @@ set SRC_FILES [list \
 ]
 
 # ---- Read Sources ----
-puts "=========================================="
 puts " GridX³ — ASIC Lint Check (Elaboration)"
 puts " Top:  $TOP_MODULE"
 puts " Config: 2x2x2 = 8 cores, 1 warp, 4 threads"
-puts "=========================================="
 
 read_verilog -sv $SRC_FILES
 
@@ -109,6 +104,4 @@ read_verilog -sv $SRC_FILES
 puts "\n>>> Running RTL Elaboration (lint check)..."
 synth_design -top $TOP_MODULE -part $PART -rtl
 
-puts "\n=========================================="
 puts " LINT CHECK PASSED — RTL Elaboration OK"
-puts "=========================================="

@@ -1,12 +1,9 @@
-# ============================================================================
 # GridX³ 2D vs 3D Controlled Comparison Runner
-# ============================================================================
 # Runs gvf.sv (3D baseline, CUBE_Z=2) and gvf_2d.sv (2D slice, CUBE_Z=1)
 # sequentially, captures logs, then invokes Python analysis.
 #
 # Usage from project root:
 #   vivado -mode batch -source scripts/run_2d_vs_3d.tcl
-# ============================================================================
 
 set SCRIPT_DIR   [file normalize [file dirname [info script]]]
 set PROJECT_ROOT [file normalize [file join $SCRIPT_DIR ..]]
@@ -121,9 +118,7 @@ proc compile_and_run {top_module src_dir mesh_src_dir sim_dir work_dir log_file 
 }
 
 
-# ============================================================================
 # MAIN
-# ============================================================================
 puts ""
 puts "╔══════════════════════════════════════════════════════════════════╗"
 puts "║   GridX³ 2D vs 3D Controlled A/B Comparison                   ║"

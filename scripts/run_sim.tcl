@@ -1,8 +1,5 @@
-# ============================================================================
 # GridX³ — Vivado Simulation Script (xsim)
-# ============================================================================
 # Usage: vivado -mode batch -source scripts/run_sim.tcl
-# ============================================================================
 
 set SCRIPT_DIR   [file normalize [file dirname [info script]]]
 set PROJECT_ROOT [file normalize [file join $SCRIPT_DIR ..]]
@@ -17,10 +14,8 @@ set SRC_DIR      [file join $PROJECT_ROOT src]
 set MESH_DIR     [file join $PROJECT_ROOT memory_mesh src]
 set SIM_DIR      [file join $PROJECT_ROOT sim]
 
-puts "=========================================="
 puts " GridX³ — Vivado Simulation (xsim)"
 puts " Testbench: $TOP_TB"
-puts "=========================================="
 
 # ---- Compile ----
 puts "\n>>> Compiling design + testbench..."
@@ -76,6 +71,4 @@ if {[catch {exec xsim ${TOP_TB}_sim -runall --nolog 2>@1} result]} {
 }
 puts $result
 
-puts "\n=========================================="
 puts " SIMULATION COMPLETE"
-puts "=========================================="

@@ -1,9 +1,6 @@
-# ==============================================================================
 # GridX³ Vivado XSIM Simulation Script
-# ==============================================================================
 # Usage:
 #   vivado -mode batch -source sim.tcl
-# ==============================================================================
 
 # Create a physical project to allow launch_simulation
 create_project sim_project ./sim_project -force

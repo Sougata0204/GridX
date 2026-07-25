@@ -1,8 +1,5 @@
-# ============================================================================
 # GridX³ — Vivado Elaboration + Synthesis Test (Minimal)
-# ============================================================================
 # Usage: vivado -mode batch -source scripts/test_synth.tcl
-# ============================================================================
 
 set SCRIPT_DIR   [file normalize [file dirname [info script]]]
 set PROJECT_ROOT [file normalize [file join $SCRIPT_DIR ..]]
@@ -96,12 +93,10 @@ set SRC_FILES [list \
 ]
 
 # ---- Read Sources ----
-puts "=========================================="
 puts " GridX³ — Vivado Synthesis Test"
 puts " Top:  $TOP_MODULE"
 puts " Part: $PART"
 puts " Config: 2x2x2 = 8 cores, 1 warp, 4 threads"
-puts "=========================================="
 
 read_verilog -sv $SRC_FILES
 read_xdc [file join $PROJECT_ROOT constraints gridx_kernel_top.xdc]
@@ -116,8 +111,6 @@ write_checkpoint -force $OUTPUT_DIR/post_synth.dcp
 report_utilization -file $OUTPUT_DIR/synth_utilization.rpt
 report_timing_summary -file $OUTPUT_DIR/synth_timing.rpt
 
-puts "\n=========================================="
 puts " SYNTHESIS COMPLETE"
 puts " Checkpoint: $OUTPUT_DIR/post_synth.dcp"
 puts " Utilization: $OUTPUT_DIR/synth_utilization.rpt"
-puts "=========================================="

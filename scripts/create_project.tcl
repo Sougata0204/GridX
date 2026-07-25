@@ -1,10 +1,7 @@
-# ============================================================================
 # GridX3 -- Vivado Project Creation Script
-# ============================================================================
 # Usage: In Vivado Tcl Console:
 #   cd D:/ML_DL_AI/GridX_Vivado/GridX/scripts
 #   source create_project.tcl
-# ============================================================================
 
 set SCRIPT_DIR   [file normalize [file dirname [info script]]]
 set PROJECT_ROOT [file normalize [file join $SCRIPT_DIR ..]]
@@ -65,13 +62,11 @@ set_property top_lib xil_defaultlib [get_filesets sim_1]
 # Adding MemoryMesh_NoC/ causes duplicate type definitions and errors.
 
 puts ""
-puts "============================================"
 puts " GridX³ Vivado Project Created"
 puts " Project: $PROJ_DIR/$PROJ_NAME.xpr"
 puts " Top:     $TOP_MODULE"
 puts " Part:    $PART"
 puts " Cores:   2×2×2 = 8 (parameterized)"
-puts "============================================"
 puts ""
 puts "Next steps:"
 puts "  1. Open Elaborated Design  (RTL schematic)"

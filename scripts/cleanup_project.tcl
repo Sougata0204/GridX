@@ -1,11 +1,8 @@
-# ============================================================================
 # GridX³ — Vivado Project Cleanup Script
-# ============================================================================
 # Run this in Vivado Tcl Console to remove stale MemoryMesh_NoC files
 # that were accidentally added to the project.
 #
 # Usage: source scripts/cleanup_project.tcl
-# ============================================================================
 
 puts "Cleaning up stale MemoryMesh_NoC files from project..."
 
