@@ -32,20 +32,17 @@ GridX³ includes a comprehensive, cycle-accurate verification suite that stress-
 ### 1. Full-Suite Execution Overview
 The testbench sweeps through varying thread block sizes, memory hazards, and ALUs. Because the `perf_cycle_count` register resets per launch, it provides precise benchmarking per kernel. In a macro view, this multi-launch sequence appears as a dense block of activity, proving the robust resetting and parking of the Kernel FSM.
 
-![Simulation Overview](docs/images/sim_overview.png)
-*(Please upload your full overview screenshot here)*
+![Simulation Overview](Screenshot%202026-08-14%20014048.png)
 
 ### 2. Kernel FSM & Dispatch Sequencing
 Zooming into a single launch window reveals the cycle-accurate progression of the hardware (Reset 0 -> Configured 1 -> Launch 2 -> Running 3). The `blocksDispatched` and `totalBlocks` registers operate entirely independently, with dispatch incrementing cleanly per core assignment.
 
-![FSM and Dispatch Trace](docs/images/fsm_dispatch.png)
-*(Please upload your zoomed FSM/Dispatch screenshot here)*
+![FSM and Dispatch Trace](Screenshot%202026-08-14%20014110.png)
 
 ### 3. Core Activation & Walking-Bit Dispatch
 The dispatcher operates on a clean, synchronous walking-bit logic. `coreResetW` and `coreStart` assert sequentially as work is distributed, proving that the multi-core scheduler is immune to cross-domain glitching.
 
-![Core Activation Sequence](docs/images/core_activation.png)
-*(Please upload your core execution screenshot here)*
+![Core Activation Sequence](Screenshot%202026-08-14%20014127.png)
 
 ## Repository Structure
 
