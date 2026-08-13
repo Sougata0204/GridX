@@ -1,4 +1,4 @@
-`timescale 1ns/1ns
+﻿`timescale 1ns/1ns
 module tb_mem_benchmark;
     parameter DATA_MEM_ADDR_BITS = 22;
     parameter DATA_MEM_DATA_BITS = 8;
@@ -101,9 +101,7 @@ module tb_mem_benchmark;
         reg [7:0] pat [0:11];
         begin
             $display("");
-            $display("+==============================================================+");
             $display("|  TEST 1: ASCII BURST PATTERN -- HELLO GRIDX!                 |");
-            $display("+==============================================================+");
             pat[0]=8'h48; pat[1]=8'h45; pat[2]=8'h4C; pat[3]=8'h4C;
             pat[4]=8'h4F; pat[5]=8'h20; pat[6]=8'h47; pat[7]=8'h52;
             pat[8]=8'h49; pat[9]=8'h44; pat[10]=8'h58; pat[11]=8'h21;
@@ -125,9 +123,7 @@ module tb_mem_benchmark;
         integer addr, errors; reg [7:0] exp;
         begin
             $display("");
-            $display("+==============================================================+");
             $display("|  TEST 2: CHARACTER FLOOD -- Full 64KB Fill + Verify           |");
-            $display("+==============================================================+");
             errors = 0;
             for (addr = 0; addr < 65536; addr = addr + 1)
                 data_memory[addr] = 8'h20 + (addr % 95);
@@ -145,9 +141,7 @@ module tb_mem_benchmark;
         integer blk, off, errors; reg [7:0] exp;
         begin
             $display("");
-            $display("+==============================================================+");
             $display("|  TEST 3: MASSIVE ARRAY STRESS -- 16x4KB Walking-1 Pattern    |");
-            $display("+==============================================================+");
             errors = 0;
             for (blk = 0; blk < 16; blk = blk + 1)
                 for (off = 0; off < 4096; off = off + 1)
@@ -166,9 +160,7 @@ module tb_mem_benchmark;
     task test_gpu_kernel;
         begin
             $display("");
-            $display("+==============================================================+");
             $display("|  TEST 4: GPU KERNEL EXECUTION -- Core Pipeline + Done Signal  |");
-            $display("+==============================================================+");
 
             program_memory[0] = 16'h0000;
             program_memory[1] = 16'h0000;
@@ -212,9 +204,7 @@ module tb_mem_benchmark;
         reg [7:0] exp;
         begin
             $display("");
-            $display("+==============================================================+");
             $display("|  TEST 5: DRAM CHANNEL STRESS -- Direct Memory Subsystem Test  |");
-            $display("+==============================================================+");
             errors = 0; rd_cnt = 0; wr_cnt = 0;
 
             for (addr = 0; addr < 65536; addr = addr + 1) begin
@@ -241,9 +231,7 @@ module tb_mem_benchmark;
     task test_mesh_modules;
         begin
             $display("");
-            $display("+==============================================================+");
             $display("|  TEST 6: MEMORYMESH 3D NoC PLUGIN -- Module Compilation      |");
-            $display("+==============================================================+");
             $display("[MESH] mem_mesh_bridge:      COMPILED");
             $display("[MESH] mem_mesh_top:         COMPILED");
             $display("[MESH] mem_mesh_router:      COMPILED");
@@ -261,9 +249,7 @@ module tb_mem_benchmark;
             tf = ascii_fail + flood_fail + array_fail;
             tb = tp + tf;
             $display("");
-            $display("+======================================================================+");
             $display("|       GridX + MemoryMesh  MEMORY BENCHMARK REPORT                    |");
-            $display("+======================================================================+");
             $display("|  TEST 1: ASCII BURST     3072 bytes   %5d pass  %5d fail  %s |", ascii_pass, ascii_fail, ascii_fail==0 ? "PASS":"FAIL");
             $display("|  TEST 2: CHAR FLOOD     65536 bytes   %5d pass  %5d fail  %s |", flood_pass, flood_fail, flood_fail==0 ? "PASS":"FAIL");
             $display("|  TEST 3: MASSIVE ARRAY  65536 bytes   %5d pass  %5d fail  %s |", array_pass, array_fail, array_fail==0 ? "PASS":"FAIL");
@@ -272,16 +258,13 @@ module tb_mem_benchmark;
                 done_seen ? "PASS":"FAIL");
             $display("|  TEST 5: DRAM STRESS    65536 bytes   65536 pass      0 fail  PASS |");
             $display("|  TEST 6: MESH MODULES   6/6 compiled                          PASS |");
-            $display("+----------------------------------------------------------------------+");
             $display("|  TOTAL BYTES TESTED:  %6d                                        |", tb);
             $display("|  TOTAL PASS:          %6d                                        |", tp);
             $display("|  TOTAL FAIL:          %6d                                        |", tf);
-            $display("|  MEMORY INTEGRITY:    %s                                       |", tf==0 ? "100.0% ":"DEGRADED");
             $display("|  GPU PIPELINE:        %s                                            |", done_seen ? "VERIFIED":"TIMEOUT ");
             $display("|  MEMORYMESH LINKED:   YES                                            |");
             $display("|  OVERALL:             %s                                         |",
                 (tf==0 && done_seen) ? "ALL PASS":"PARTIAL ");
-            $display("+======================================================================+");
         end
     endtask
 
@@ -293,12 +276,9 @@ module tb_mem_benchmark;
         array_pass=0; array_fail=0; peak_rd=0; peak_wr=0;
         cycle_count=0; done_cycle=-1; done_seen=0;
         reset=1; start=0; device_control_write_enable=0; device_control_data=0;
-        $display("");
-        $display("########################################################################");
-        $display("##  GridX GPU + MemoryMesh 3D NoC -- MEMORY BENCHMARK SUITE           ##");
-        $display("##  Cores: %0d  Threads: %0d  DRAM Ch: %0d  Mesh: 16x16x16 3D       ##",
+        $display("[TB_MEM_BENCHMARK] GridX GPU + MemoryMesh 3D NoC -- MEMORY BENCHMARK SUITE");
+        $display("[TB_MEM_BENCHMARK] Cores: %0d | Threads: %0d | DRAM Ch: %0d | Mesh: 16x16x16 3D",
             NUM_CORES, THREAD_COUNT, DATA_MEM_NUM_CHANNELS);
-        $display("########################################################################");
         test_ascii_burst();
         test_char_flood();
         test_massive_array();

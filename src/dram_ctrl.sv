@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module dram_ctrl #(
+module dramCtrl #(
     parameter ADDR_WIDTH = 40,
     parameter DATA_WIDTH = 256,
     parameter BURST_LENGTH = 8,
@@ -12,29 +12,29 @@ module dram_ctrl #(
     input  wire reset,
     
     // Core Interface
-    input  wire req_valid,
-    input  wire [ADDR_WIDTH-1:0] req_addr,
-    input  wire [DATA_WIDTH-1:0] req_wdata,
-    input  wire req_write,
-    output reg  req_ready,
+    input  wire reqValid,
+    input  wire [ADDR_WIDTH-1:0] reqAddr,
+    input  wire [DATA_WIDTH-1:0] reqWdata,
+    input  wire reqWrite,
+    output reg  reqReady,
     
-    output reg  resp_valid,
-    output reg  [DATA_WIDTH-1:0] resp_data,
-    output reg  [ADDR_WIDTH-1:0] resp_addr,
+    output reg  respValid,
+    output reg  [DATA_WIDTH-1:0] respData,
+    output reg  [ADDR_WIDTH-1:0] respAddr,
     
     // PHY Interface
-    output reg  phy_cmd_valid,
-    output reg  [2:0] phy_cmd, // 0: ACT, 1: PRE, 2: RD, 3: WR
-    output reg  [ADDR_WIDTH-1:0] phy_addr,
-    output reg  [DATA_WIDTH-1:0] phy_wdata,
-    input  wire [DATA_WIDTH-1:0] phy_rdata,
-    input  wire phy_rdata_valid,
+    output reg  phyCmdValid,
+    output reg  [2:0] phyCmd, // 0: ACT, 1: PRE, 2: RD, 3: WR
+    output reg  [ADDR_WIDTH-1:0] phyAddr,
+    output reg  [DATA_WIDTH-1:0] phyWdata,
+    input  wire [DATA_WIDTH-1:0] phyRdata,
+    input  wire phyRdataValid,
     
     output reg  busy,
-    output reg  [31:0] total_reads,
-    output reg  [31:0] total_writes,
-    output reg  [31:0] row_hits,
-    output reg  [31:0] row_misses
+    output reg  [31:0] totalReads,
+    output reg  [31:0] totalWrites,
+    output reg  [31:0] rowHits,
+    output reg  [31:0] rowMisses
 );
 
     localparam CMD_ACT = 3'd0;
@@ -46,8 +46,8 @@ module dram_ctrl #(
     // Assume Row is bits [39:16], Bank is bits [15:13], Col is bits [12:5], Byte is [4:0]
     
     // Open Row Table
-    reg valid_row [7:0];
-    reg [23:0] open_row [7:0]; // 8 banks
+    reg validRow [7:0];
+    reg [23:0] openRow [7:0]; // 8 banks
     
     typedef enum logic [2:0] {
         IDLE,
@@ -55,117 +55,117 @@ module dram_ctrl #(
         ACTIVATE,
         ACCESS,
         WAIT_PHY
-    } state_e;
+    } stateE;
     
-    state_e state;
+    stateE state;
     
-    reg [ADDR_WIDTH-1:0] latched_addr;
-    reg [DATA_WIDTH-1:0] latched_wdata;
-    reg latched_write;
+    reg [ADDR_WIDTH-1:0] latchedAddr;
+    reg [DATA_WIDTH-1:0] latchedWdata;
+    reg latchedWrite;
     
-    wire [2:0] cur_bank = latched_addr[15:13];
-    wire [23:0] cur_row = latched_addr[39:16];
+    wire [2:0] curBank = latchedAddr[15:13];
+    wire [23:0] curRow = latchedAddr[39:16];
     
-    wire row_hit = valid_row[cur_bank] && (open_row[cur_bank] == cur_row);
+    wire rowHit = validRow[curBank] && (openRow[curBank] == curRow);
     
     integer i;
 
     always @(posedge clk) begin
         if (reset) begin
             state <= IDLE;
-            req_ready <= 1;
-            resp_valid <= 0;
-            phy_cmd_valid <= 0;
+            reqReady <= 1;
+            respValid <= 0;
+            phyCmdValid <= 0;
             busy <= 0;
             
             for (i = 0; i < 8; i = i + 1) begin
-                valid_row[i] <= 0;
+                validRow[i] <= 0;
             end
             
-            total_reads <= 0;
-            total_writes <= 0;
-            row_hits <= 0;
-            row_misses <= 0;
+            totalReads <= 0;
+            totalWrites <= 0;
+            rowHits <= 0;
+            rowMisses <= 0;
         end else begin
-            resp_valid <= 0;
-            phy_cmd_valid <= 0;
+            respValid <= 0;
+            phyCmdValid <= 0;
             
             // Forward PHY read data
-            if (phy_rdata_valid) begin
-                resp_valid <= 1;
-                resp_data <= phy_rdata;
-                resp_addr <= latched_addr;
+            if (phyRdataValid) begin
+                respValid <= 1;
+                respData <= phyRdata;
+                respAddr <= latchedAddr;
             end
             
             case (state)
                 IDLE: begin
-                    if (req_valid) begin
-                        latched_addr <= req_addr;
-                        latched_wdata <= req_wdata;
-                        latched_write <= req_write;
-                        req_ready <= 0;
+                    if (reqValid) begin
+                        latchedAddr <= reqAddr;
+                        latchedWdata <= reqWdata;
+                        latchedWrite <= reqWrite;
+                        reqReady <= 0;
                         busy <= 1;
                         
                         // Check open page table
-                        if (valid_row[req_addr[15:13]] && open_row[req_addr[15:13]] == req_addr[39:16]) begin
+                        if (validRow[reqAddr[15:13]] && openRow[reqAddr[15:13]] == reqAddr[39:16]) begin
                             // Row hit
                             state <= ACCESS;
-                            row_hits <= row_hits + 1;
-                        end else if (valid_row[req_addr[15:13]]) begin
+                            rowHits <= rowHits + 1;
+                        end else if (validRow[reqAddr[15:13]]) begin
                             // Row miss, page open -> Precharge needed
                             state <= PRECHARGE;
-                            row_misses <= row_misses + 1;
+                            rowMisses <= rowMisses + 1;
                         end else begin
                             // Row miss, page closed -> Activate needed
                             state <= ACTIVATE;
-                            row_misses <= row_misses + 1;
+                            rowMisses <= rowMisses + 1;
                         end
                     end else begin
                         busy <= 0;
-                        req_ready <= 1;
+                        reqReady <= 1;
                     end
                 end
                 
                 PRECHARGE: begin
-                    phy_cmd_valid <= 1;
-                    phy_cmd <= CMD_PRE;
-                    phy_addr <= latched_addr; // Bank is in the address
-                    valid_row[cur_bank] <= 0;
+                    phyCmdValid <= 1;
+                    phyCmd <= CMD_PRE;
+                    phyAddr <= latchedAddr; // Bank is in the address
+                    validRow[curBank] <= 0;
                     state <= ACTIVATE;
                 end
                 
                 ACTIVATE: begin
-                    phy_cmd_valid <= 1;
-                    phy_cmd <= CMD_ACT;
-                    phy_addr <= latched_addr;
-                    valid_row[cur_bank] <= 1;
-                    open_row[cur_bank] <= cur_row;
+                    phyCmdValid <= 1;
+                    phyCmd <= CMD_ACT;
+                    phyAddr <= latchedAddr;
+                    validRow[curBank] <= 1;
+                    openRow[curBank] <= curRow;
                     state <= ACCESS;
                 end
                 
                 ACCESS: begin
-                    phy_cmd_valid <= 1;
-                    phy_cmd <= latched_write ? CMD_WR : CMD_RD;
-                    phy_addr <= latched_addr;
-                    phy_wdata <= latched_wdata;
+                    phyCmdValid <= 1;
+                    phyCmd <= latchedWrite ? CMD_WR : CMD_RD;
+                    phyAddr <= latchedAddr;
+                    phyWdata <= latchedWdata;
                     
-                    if (latched_write) begin
-                        total_writes <= total_writes + 1;
+                    if (latchedWrite) begin
+                        totalWrites <= totalWrites + 1;
                         // For writes, we can ACK immediately after sending to PHY
-                        resp_valid <= 1;
-                        resp_addr <= latched_addr;
+                        respValid <= 1;
+                        respAddr <= latchedAddr;
                         state <= IDLE;
-                        req_ready <= 1;
+                        reqReady <= 1;
                     end else begin
-                        total_reads <= total_reads + 1;
+                        totalReads <= totalReads + 1;
                         state <= WAIT_PHY;
                     end
                 end
                 
                 WAIT_PHY: begin
-                    if (phy_rdata_valid) begin // Assuming PHY asserts this for 1 cycle when data returns
+                    if (phyRdataValid) begin // Assuming PHY asserts this for 1 cycle when data returns
                         state <= IDLE;
-                        req_ready <= 1;
+                        reqReady <= 1;
                     end
                 end
                 
@@ -173,14 +173,14 @@ module dram_ctrl #(
         end
         
         // Debug prints (simulation only)
-        // synthesis translate_off
+        // synthesis translateOff
         if (!reset) begin
-            if (req_valid)
-                $display("[%0t] [DRAM] req_valid=1, addr=%h, write=%b, ready=%0b", $time, req_addr, req_write, req_ready);
+            if (reqValid)
+                $display("[%0t] [DRAM] reqValid=1, addr=%h, write=%b, ready=%0b", $time, reqAddr, reqWrite, reqReady);
             if (state != IDLE)
-                $display("[%0t] [DRAM] state=%s, bank=%0d, row=%h", $time, state.name(), cur_bank, cur_row);
+                $display("[%0t] [DRAM] state=%s, bank=%0d, row=%h", $time, state.name(), curBank, curRow);
         end
-        // synthesis translate_on
+        // synthesis translateOn
     end
 
 endmodule

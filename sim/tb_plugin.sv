@@ -255,16 +255,8 @@ module tb_plugin;
         k_flits_prev                = 0;
 
         // Header
-        $display("");
-        $display("########################################################################");
-        $display("##  GridX 3D GPU + MemoryMesh Plugin — Full Architecture Test Suite  ##");
-        $display("##  Arch   : GridX_16x16x16                                          ##");
-        $display("##  Cores  : %0d                                               ##", NUM_CORES);
-        $display("##  Threads: %0d  (32 per core, 4 warps x 8 threads)        ##", TOTAL_THREADS);
-        $display("##  NoC    : 16x16x16 3D Mesh, 512-bit flits, 4 VCs                  ##");
-        $display("##  Memory : 8x HBM3 Controllers on NoC boundary nodes               ##");
-        $display("########################################################################");
-        $display("");
+        $display("[TB_PLUGIN] GridX 3D GPU + MemoryMesh Plugin -- Full Architecture Test Suite");
+        $display("[TB_PLUGIN] Cores: %0d | Threads: %0d | NoC: 16x16x16 3D Mesh | HBM: 8x HBM3 Controllers", NUM_CORES, TOTAL_THREADS);
 
         // KERNEL 0 - MASS VECTOR INIT
         // Each thread writes its block_id to global memory.

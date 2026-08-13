@@ -2,49 +2,54 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module mem_mesh_bridge #(
+module memMeshBridge #(
     parameter NUM_GPU_CHANNELS  = 1,
     parameter ADDR_BITS         = 22,
     parameter DATA_BITS         = 8,
-    parameter MESH_FLIT_WIDTH   = 512,
+    parameter MESH_FLIT_WIDTH   = 256,
     parameter MESH_VC_ID_W      = 2,
     parameter MESH_COORD_W      = 2,
     parameter TX_TABLE_ENTRIES  = 4,
-    parameter TX_ID_W           = 5
+    parameter TX_ID_W           = 5,
+    parameter NUM_HBM_NODES = 2,
+    parameter HBM_BASE_NODE = 6,
+    parameter MESH_X = 2,
+    parameter MESH_Y = 2
 ) (
     input  wire clk,
     input  wire reset,
 
-    input  wire [NUM_GPU_CHANNELS-1:0]  gpu_read_valid,
-    input  wire [ADDR_BITS-1:0]         gpu_read_address  [NUM_GPU_CHANNELS-1:0],
-    output reg  [NUM_GPU_CHANNELS-1:0]  gpu_read_ready,
-    output reg  [DATA_BITS-1:0]         gpu_read_data     [NUM_GPU_CHANNELS-1:0],
+    input  wire [NUM_GPU_CHANNELS-1:0]  gpuReadValid,
+    input  wire [ADDR_BITS-1:0]         gpuReadAddress  [NUM_GPU_CHANNELS-1:0],
+    output reg  [NUM_GPU_CHANNELS-1:0]  gpuReadReady,
+    output reg  [DATA_BITS-1:0]         gpuReadData     [NUM_GPU_CHANNELS-1:0],
 
-    input  wire [NUM_GPU_CHANNELS-1:0]  gpu_write_valid,
-    input  wire [ADDR_BITS-1:0]         gpu_write_address [NUM_GPU_CHANNELS-1:0],
-    input  wire [DATA_BITS-1:0]         gpu_write_data    [NUM_GPU_CHANNELS-1:0],
-    output reg  [NUM_GPU_CHANNELS-1:0]  gpu_write_ready,
+    input  wire [NUM_GPU_CHANNELS-1:0]  gpuWriteValid,
+    input  wire [ADDR_BITS-1:0]         gpuWriteAddress [NUM_GPU_CHANNELS-1:0],
+    input  wire [DATA_BITS-1:0]         gpuWriteData    [NUM_GPU_CHANNELS-1:0],
+    output wire [NUM_GPU_CHANNELS-1:0]  gpuWriteReady,
 
-    output reg                          mesh_tx_valid,
-    output reg  [MESH_FLIT_WIDTH-1:0]   mesh_tx_data,
-    output reg  [1:0]                   mesh_tx_flit_type,
-    output reg  [MESH_VC_ID_W-1:0]      mesh_tx_vc_id,
-    input  wire                         mesh_tx_credit_valid,
-    input  wire [MESH_VC_ID_W-1:0]      mesh_tx_credit_vc_id,
+    output reg                          meshTxValid,
+    output reg  [MESH_FLIT_WIDTH-1:0]   meshTxData,
+    output reg  [1:0]                   meshTxFlitType,
+    output reg  [MESH_VC_ID_W-1:0]      meshTxVcId,
+    input  wire                         meshTxCreditValid,
+    input  wire [MESH_VC_ID_W-1:0]      meshTxCreditVcId,
 
-    input  wire                         mesh_rx_valid,
-    input  wire [MESH_FLIT_WIDTH-1:0]   mesh_rx_data,
-    input  wire [1:0]                   mesh_rx_flit_type,
-    input  wire [MESH_VC_ID_W-1:0]      mesh_rx_vc_id,
-    output reg                          mesh_rx_credit_valid,
-    output reg  [MESH_VC_ID_W-1:0]      mesh_rx_credit_vc_id,
+    input  wire                         meshRxValid,
+    input  wire [MESH_FLIT_WIDTH-1:0]   meshRxData,
+    input  wire [1:0]                   meshRxFlitType,
+    input  wire [MESH_VC_ID_W-1:0]      meshRxVcId,
+    output reg                          meshRxCreditValid,
+    output reg  [MESH_VC_ID_W-1:0]      meshRxCreditVcId,
 
-    input  wire [MESH_COORD_W-1:0]      my_x,
-    input  wire [MESH_COORD_W-1:0]      my_y,
-    input  wire [MESH_COORD_W-1:0]      my_z,
+    input  wire [MESH_COORD_W-1:0]      myX,
+    input  wire [MESH_COORD_W-1:0]      myY,
+    input  wire [MESH_COORD_W-1:0]      myZ,
 
-    output wire [6:0]                   outstanding_count,
-    output wire                         bridge_busy
+    output wire [6:0]                   outstandingCount,
+    output wire                         bridgeBusy,
+    output wire                         bridgeCreditsFull
 );
 
     localparam CH_ID_W = (NUM_GPU_CHANNELS > 1) ? $clog2(NUM_GPU_CHANNELS) : 1;
@@ -58,231 +63,237 @@ module mem_mesh_bridge #(
     localparam [MESH_VC_ID_W-1:0] VC_RESP  = 2'd2;
 
 
+
     typedef enum logic [2:0] {
         TX_IDLE,
         TX_ARBITRATE,
         TX_SEND_HEAD,
         TX_SEND_TAIL,
         TX_WAIT_CREDIT
-    } tx_state_e;
+    } txStateE;
 
-    tx_state_e           tx_state;
+    txStateE           txState;
 
-    reg [TX_TABLE_ENTRIES-1:0]  tx_active;
-    reg [$clog2(NUM_GPU_CHANNELS)-1:0] tx_src_channel [TX_TABLE_ENTRIES-1:0];
-    reg [TX_TABLE_ENTRIES-1:0]  tx_is_write;
-    reg [6:0]                   tx_count;
+    reg [TX_TABLE_ENTRIES-1:0]  txActive;
+    reg [$clog2(NUM_GPU_CHANNELS)-1:0] txSrcChannel [TX_TABLE_ENTRIES-1:0];
+    reg [TX_TABLE_ENTRIES-1:0]  txIsWrite;
+    reg [6:0]                   txCount;
+    reg [4:0]                   meshTxCredits [3:0];
 
-    assign outstanding_count = tx_count;
-    assign bridge_busy       = (tx_count > 0) || (tx_state != TX_IDLE);
-    reg [$clog2(NUM_GPU_CHANNELS)-1:0] tx_winner;
-    reg                  tx_winner_is_write;
-    reg [ADDR_BITS-1:0]  tx_winner_addr;
-    reg [DATA_BITS-1:0]  tx_winner_wdata;
-    reg [TX_ID_W-1:0]    tx_alloc_id;
+    assign outstandingCount = txCount;
+    assign bridgeBusy       = (txCount > 0) || (txState != TX_IDLE);
+    // Assumes FLITS_PER_BUFFER = 8 for the VC
+    assign bridgeCreditsFull = (meshTxCredits[VC_WRITE] == 5'd8);
 
-    reg [4:0] mesh_tx_credits [3:0];
+    reg [$clog2(NUM_GPU_CHANNELS)-1:0] txWinner;
+    reg                  txWinnerIsWrite;
+    reg [ADDR_BITS-1:0]  txWinnerAddr;
+    reg [DATA_BITS-1:0]  txWinnerWdata;
+    reg [TX_ID_W-1:0]    txAllocId;
 
-    reg [TX_ID_W-1:0]    free_tx_id;
-    reg                  tx_table_full;
+    reg [TX_ID_W-1:0]    freeTxId;
+    reg                  txTableFull;
 
     always @(*) begin
-        free_tx_id    = 0;
-        tx_table_full = 1;
+        freeTxId    = 0;
+        txTableFull = 1;
         for (integer t = 0; t < TX_TABLE_ENTRIES; t = t + 1) begin
-            if (!tx_active[t] && tx_table_full) begin
-                free_tx_id    = t[TX_ID_W-1:0];
-                tx_table_full = 0;
+            if (!txActive[t] && txTableFull) begin
+                freeTxId    = t[TX_ID_W-1:0];
+                txTableFull = 0;
             end
         end
     end
 
-    reg [CH_ID_W-1:0] rr_ptr;
-    reg [CH_ID_W-1:0] arb_winner;
-    reg                                arb_found;
-    reg                                arb_is_write;
+    reg [CH_ID_W-1:0] rrPtr;
+    reg [CH_ID_W-1:0] arbWinner;
+    reg                                arbFound;
+    reg                                arbIsWrite;
 
     always @(*) begin
-        arb_found    = 0;
-        arb_winner   = 0;
-        arb_is_write = 0;
+        arbFound    = 0;
+        arbWinner   = 0;
+        arbIsWrite = 0;
         for (integer ch = 0; ch < NUM_GPU_CHANNELS; ch = ch + 1) begin
-            automatic integer idx = (rr_ptr + ch) % NUM_GPU_CHANNELS;
-            if (!arb_found) begin
-                if (gpu_write_valid[idx]) begin
-                    arb_found    = 1;
-                    arb_winner   = idx[CH_ID_W-1:0];
-                    arb_is_write = 1;
-                end else if (gpu_read_valid[idx]) begin
-                    arb_found    = 1;
-                    arb_winner   = idx[CH_ID_W-1:0];
-                    arb_is_write = 0;
+            automatic integer idx = (rrPtr + ch) % NUM_GPU_CHANNELS;
+            if (!arbFound) begin
+                if (gpuWriteValid[idx]) begin
+                    arbFound    = 1;
+                    arbWinner   = idx[CH_ID_W-1:0];
+                    arbIsWrite = 1;
+                end else if (gpuReadValid[idx]) begin
+                    arbFound    = 1;
+                    arbWinner   = idx[CH_ID_W-1:0];
+                    arbIsWrite = 0;
                 end
             end
         end
     end
 
-    localparam NUM_HBM_NODES = 8;
-    localparam MESH_DIM = (1 << MESH_COORD_W);  // 2^MESH_COORD_W (e.g. 4-bit coord -> 16, but actual mesh is 8)
-    localparam TOTAL_NODES = MESH_DIM * MESH_DIM * MESH_DIM;
-    localparam HBM_BASE_NODE = TOTAL_NODES - NUM_HBM_NODES;
-
-    reg [MESH_COORD_W-1:0] hbm_dest_x;
-    reg [MESH_COORD_W-1:0] hbm_dest_y;
-    reg [MESH_COORD_W-1:0] hbm_dest_z;
+    reg [MESH_COORD_W-1:0] hbmDestX;
+    reg [MESH_COORD_W-1:0] hbmDestY;
+    reg [MESH_COORD_W-1:0] hbmDestZ;
 
     always @(*) begin
-        automatic integer hbm_sel = tx_winner_addr[4:2];
-        automatic integer hbm_node = HBM_BASE_NODE + hbm_sel;
-        hbm_dest_x = hbm_node % MESH_DIM;
-        hbm_dest_y = (hbm_node / MESH_DIM) % MESH_DIM;
-        hbm_dest_z = hbm_node / (MESH_DIM * MESH_DIM);
+        automatic integer hbmSel = txWinnerAddr[6:5]; // Interleave across controllers
+        automatic integer hbmNode = HBM_BASE_NODE + (hbmSel % NUM_HBM_NODES);
+        hbmDestX = hbmNode % MESH_X;
+        hbmDestY = (hbmNode / MESH_X) % MESH_Y;
+        hbmDestZ = hbmNode / (MESH_X * MESH_Y);
     end
 
     integer i;
     always @(posedge clk) begin
         if (reset) begin
-            tx_state            <= TX_IDLE;
-            mesh_tx_valid       <= 0;
-            mesh_tx_data        <= 0;
-            mesh_tx_flit_type   <= 0;
-            mesh_tx_vc_id       <= 0;
-            gpu_read_ready      <= 0;
-            gpu_write_ready     <= 0;
-            tx_active           <= 0;
-            tx_count            <= 0;
-            rr_ptr              <= 0;
+            txState            <= TX_IDLE;
+            meshTxValid       <= 0;
+            meshTxData        <= 0;
+            meshTxFlitType   <= 0;
+            meshTxVcId       <= 0;
+            gpuReadReady      <= 0;
+            txActive           <= 0;
+            txCount            <= 0;
+            rrPtr              <= 0;
             for (i = 0; i < TX_TABLE_ENTRIES; i = i + 1) begin
-                tx_src_channel[i] <= 0;
-                tx_is_write[i]    <= 0;
+                txSrcChannel[i] <= 0;
+                txIsWrite[i]    <= 0;
             end
             for (i = 0; i < 4; i = i + 1) begin
-                mesh_tx_credits[i] <= 5'd8;
+                meshTxCredits[i] <= 5'd8;
             end
         end else begin
+            automatic reg [4:0] nextCredits [3:0];
 
-            gpu_read_ready  <= 0;
-            gpu_write_ready <= 0;
-            mesh_tx_valid   <= 0;
+            gpuReadReady  <= 0;
+            meshTxValid   <= 0;
 
-            if (mesh_tx_credit_valid) begin
-                mesh_tx_credits[mesh_tx_credit_vc_id] <=
-                    mesh_tx_credits[mesh_tx_credit_vc_id] + 1;
+            for (i=0; i<4; i=i+1) nextCredits[i] = meshTxCredits[i];
+
+            if (meshTxCreditValid) begin
+                nextCredits[meshTxCreditVcId] = nextCredits[meshTxCreditVcId] + 1;
             end
 
-            case (tx_state)
+            case (txState)
                 TX_IDLE: begin
-                    if (arb_found && !tx_table_full) begin
-                        tx_winner          <= arb_winner;
-                        tx_winner_is_write <= arb_is_write;
-                        tx_winner_addr     <= arb_is_write ?
-                                              gpu_write_address[arb_winner] :
-                                              gpu_read_address[arb_winner];
-                        tx_winner_wdata    <= arb_is_write ?
-                                              gpu_write_data[arb_winner] : 8'd0;
-                        tx_alloc_id        <= free_tx_id;
-                        tx_state           <= TX_SEND_HEAD;
+                    if (arbFound && !txTableFull) begin
+                        txWinner          <= arbWinner;
+                        txWinnerIsWrite <= arbIsWrite;
+                        txWinnerAddr     <= arbIsWrite ?
+                                              gpuWriteAddress[arbWinner] :
+                                              gpuReadAddress[arbWinner];
+                        txWinnerWdata    <= arbIsWrite ?
+                                              gpuWriteData[arbWinner] : 8'd0;
+                        txAllocId        <= freeTxId;
+                        txState           <= TX_SEND_HEAD;
                     end
                 end
 
                 TX_SEND_HEAD: begin
                     automatic reg [MESH_VC_ID_W-1:0] vc =
-                        tx_winner_is_write ? VC_WRITE : VC_READ;
+                        txWinnerIsWrite ? VC_WRITE : VC_READ;
 
-                    if (mesh_tx_credits[vc] > 0) begin
-                        mesh_tx_valid     <= 1;
-                        mesh_tx_flit_type <= FLIT_HEAD;
-                        mesh_tx_vc_id     <= vc;
-                        mesh_tx_data      <= {
-                            tx_winner_is_write ? 3'b001 : 3'b000,
-                            vc,
-                            my_x, my_y, my_z,
-                            hbm_dest_x, hbm_dest_y, hbm_dest_z,
-                            tx_alloc_id,
-                            4'b0000,
-                            4'b0000,
-                            2'b00,
-                            tx_winner_addr,
-                            tx_winner_wdata,
-                            438'd0
-                        };
+                    if (nextCredits[vc] > 0) begin
+                        meshTxValid     <= 1;
+                        meshTxFlitType <= FLIT_HEAD;
+                        meshTxVcId     <= vc;
 
-                        mesh_tx_credits[vc] <= mesh_tx_credits[vc] - 1;
+                        begin
+                            reg [MESH_FLIT_WIDTH-1:0] flitData;
+                            flitData = 256'd0;
+                            flitData[31:0]    = {10'd0, txWinnerAddr};
+                            flitData[39:32]   = txWinnerWdata;
+                            flitData[112:111] = hbmDestZ[1:0];
+                            flitData[114:113] = hbmDestY[1:0];
+                            flitData[116:115] = hbmDestX[1:0];
+                            flitData[125:121] = txAllocId;
+                            flitData[250:245] = {myZ[1:0], myY[1:0], myX[1:0]};
+                            flitData[252:251] = vc;
+                            flitData[255:253] = txWinnerIsWrite ? 3'b001 : 3'b000;
+                            meshTxData <= flitData;
+                        end
 
-                        tx_active[tx_alloc_id]      <= 1;
-                        tx_src_channel[tx_alloc_id] <= tx_winner;
-                        tx_is_write[tx_alloc_id]    <= tx_winner_is_write;
-                        tx_count                    <= tx_count + 1;
+                        nextCredits[vc] = nextCredits[vc] - 1;
 
-                        tx_state <= TX_SEND_TAIL;
+                        txActive[txAllocId]      <= 1;
+                        txSrcChannel[txAllocId] <= txWinner;
+                        txIsWrite[txAllocId]    <= txWinnerIsWrite;
+                        txCount                    <= txCount + 1;
+
+                        txState <= TX_SEND_TAIL;
                     end
-
                 end
 
                 TX_SEND_TAIL: begin
                     automatic reg [MESH_VC_ID_W-1:0] vc =
-                        tx_winner_is_write ? VC_WRITE : VC_READ;
+                        txWinnerIsWrite ? VC_WRITE : VC_READ;
 
-                    if (mesh_tx_credits[vc] > 0) begin
-                        mesh_tx_valid     <= 1;
-                        mesh_tx_flit_type <= FLIT_TAIL;
-                        mesh_tx_vc_id     <= vc;
-                        mesh_tx_data      <= {
-                            tx_alloc_id,
-                            tx_winner_addr,
-                            {(MESH_FLIT_WIDTH-27){1'b0}}
-                        };
+                    if (nextCredits[vc] > 0) begin
+                        meshTxValid     <= 1;
+                        meshTxFlitType <= FLIT_TAIL;
+                        meshTxVcId     <= vc;
 
-                        mesh_tx_credits[vc] <= mesh_tx_credits[vc] - 1;
+                        begin
+                            reg [MESH_FLIT_WIDTH-1:0] tailData;
+                            tailData = 256'd0;
+                            tailData[31:0]    = {10'd0, txWinnerAddr};
+                            tailData[125:121] = txAllocId;
+                            meshTxData <= tailData;
+                        end
 
-                        if (tx_winner_is_write) begin
-                            gpu_write_ready[tx_winner] <= 1;
+                        nextCredits[vc] = nextCredits[vc] - 1;
+
+                        if (txWinnerIsWrite) begin
+                            // gpuWriteReady is now driven combinatorially (see bottom of file)
+                            txActive[txAllocId] <= 0;
+                            txCount <= txCount - 1;
                         end else begin
 
                         end
 
-                        rr_ptr   <= (tx_winner + 1) % NUM_GPU_CHANNELS;
-                        tx_state <= TX_IDLE;
+                        rrPtr   <= (txWinner + 1) % NUM_GPU_CHANNELS;
+                        txState <= TX_IDLE;
                     end
                 end
 
-                default: tx_state <= TX_IDLE;
+                default: txState <= TX_IDLE;
             endcase
+
+            for (i=0; i<4; i=i+1) meshTxCredits[i] <= nextCredits[i];
         end
     end
 
-    reg [TX_ID_W-1:0] rx_pending_tx_id;
+    reg [TX_ID_W-1:0] rxPendingTxId;
 
     always @(posedge clk) begin
         if (reset) begin
-            mesh_rx_credit_valid <= 0;
-            mesh_rx_credit_vc_id <= 0;
-            rx_pending_tx_id     <= 0;
+            meshRxCreditValid <= 0;
+            meshRxCreditVcId <= 0;
+            rxPendingTxId     <= 0;
         end else begin
-            mesh_rx_credit_valid <= 0;
+            meshRxCreditValid <= 0;
 
-            if (mesh_rx_valid) begin
+            if (meshRxValid) begin
 
-                mesh_rx_credit_valid <= 1;
-                mesh_rx_credit_vc_id <= mesh_rx_vc_id;
+                meshRxCreditValid <= 1;
+                meshRxCreditVcId <= meshRxVcId;
 
-                if (mesh_rx_flit_type == FLIT_HEAD) begin
+                if (meshRxFlitType == FLIT_HEAD) begin
 
-                    rx_pending_tx_id <= mesh_rx_data[494:490];
+                    rxPendingTxId <= meshRxData[125:121];
                 end
-                else if (mesh_rx_flit_type == FLIT_TAIL) begin
+                else if (meshRxFlitType == FLIT_TAIL) begin
 
-                    automatic reg [TX_ID_W-1:0] tid = rx_pending_tx_id;
-                    automatic integer src_ch = tx_src_channel[tid];
+                    automatic reg [TX_ID_W-1:0] tid = rxPendingTxId;
+                    automatic integer srcCh = txSrcChannel[tid];
 
-                    if (!tx_is_write[tid]) begin
+                    if (!txIsWrite[tid]) begin
 
-                        gpu_read_ready[src_ch] <= 1;
-                        gpu_read_data[src_ch]  <= mesh_rx_data[DATA_BITS-1:0];
+                        gpuReadReady[srcCh] <= 1;
+                        gpuReadData[srcCh]  <= meshRxData[DATA_BITS-1:0];
                     end
 
-                    tx_active[tid] <= 0;
-                    tx_count       <= tx_count - 1;
+                    txActive[tid] <= 0;
+                    txCount       <= txCount - 1;
                 end
             end
         end
@@ -291,11 +302,26 @@ module mem_mesh_bridge #(
 `ifdef VERILATOR
     always @(posedge clk) begin
         if (!reset) begin
-            if (tx_count > TX_TABLE_ENTRIES) begin
-                $display("ERROR: mem_mesh_bridge TX overflow! count=%0d", tx_count);
+            if (txCount > TX_TABLE_ENTRIES) begin
+                $display("ERROR: memMeshBridge TX overflow! count=%0d", txCount);
             end
         end
     end
 `endif
+
+    // Combinatorial assignment for gpuWriteReady
+    reg [NUM_GPU_CHANNELS-1:0] gpuWriteReadyComb;
+    always @(*) begin
+        gpuWriteReadyComb = 0;
+        if (txState == TX_SEND_TAIL) begin
+            automatic reg [MESH_VC_ID_W-1:0] vc = txWinnerIsWrite ? VC_WRITE : VC_READ;
+            if (meshTxCredits[vc] > 0) begin
+                if (txWinnerIsWrite) begin
+                    gpuWriteReadyComb[txWinner] = 1;
+                end
+            end
+        end
+    end
+    assign gpuWriteReady = gpuWriteReadyComb;
 
 endmodule

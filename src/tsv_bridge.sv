@@ -4,7 +4,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module tsv_bridge #(
+module tsvBridge #(
     parameter DATA_WIDTH = 1024,
     parameter LATENCY_CYCLES = 1,
     parameter BUFFER_DEPTH = 4
@@ -13,144 +13,144 @@ module tsv_bridge #(
     input  wire reset,
     
     // Transmit Path (Local to TSV)
-    input  wire tx_valid,
-    input  wire [DATA_WIDTH-1:0] tx_data,
-    output wire tx_ready,
+    input  wire txValid,
+    input  wire [DATA_WIDTH-1:0] txData,
+    output wire txReady,
     
     // Receive Path (TSV to Local)
-    output wire rx_valid,
-    output wire [DATA_WIDTH-1:0] rx_data,
-    input  wire rx_ready,
+    output wire rxValid,
+    output wire [DATA_WIDTH-1:0] rxData,
+    input  wire rxReady,
     
     // TSV Physical Interface
-    output wire tsv_out_valid,
-    output wire [DATA_WIDTH-1:0] tsv_out_data,
-    input  wire tsv_in_valid,
-    input  wire [DATA_WIDTH-1:0] tsv_in_data,
+    output wire tsvOutValid,
+    output wire [DATA_WIDTH-1:0] tsvOutData,
+    input  wire tsvInValid,
+    input  wire [DATA_WIDTH-1:0] tsvInData,
     
     // Performance and Status
-    output reg  [31:0] perf_tx_count,
-    output reg  [31:0] perf_rx_count,
-    output reg  [31:0] perf_stall_cycles,
-    output wire link_up
+    output reg  [31:0] perfTxCount,
+    output reg  [31:0] perfRxCount,
+    output reg  [31:0] perfStallCycles,
+    output wire linkUp
 );
 
     // TX FIFO
-    reg [DATA_WIDTH-1:0] tx_fifo [0:BUFFER_DEPTH-1];
-    reg [$clog2(BUFFER_DEPTH):0] tx_count;
-    reg [$clog2(BUFFER_DEPTH)-1:0] tx_wr_ptr, tx_rd_ptr;
+    reg [DATA_WIDTH-1:0] txFifo [0:BUFFER_DEPTH-1];
+    reg [$clog2(BUFFER_DEPTH):0] txCount;
+    reg [$clog2(BUFFER_DEPTH)-1:0] txWrPtr, txRdPtr;
     
-    assign tx_ready = (tx_count < BUFFER_DEPTH);
+    assign txReady = (txCount < BUFFER_DEPTH);
     
     // RX FIFO
-    reg [DATA_WIDTH-1:0] rx_fifo [0:BUFFER_DEPTH-1];
-    reg [$clog2(BUFFER_DEPTH):0] rx_count;
-    reg [$clog2(BUFFER_DEPTH)-1:0] rx_wr_ptr, rx_rd_ptr;
+    reg [DATA_WIDTH-1:0] rxFifo [0:BUFFER_DEPTH-1];
+    reg [$clog2(BUFFER_DEPTH):0] rxCount;
+    reg [$clog2(BUFFER_DEPTH)-1:0] rxWrPtr, rxRdPtr;
     
-    assign rx_valid = (rx_count > 0);
-    assign rx_data = rx_fifo[rx_rd_ptr];
+    assign rxValid = (rxCount > 0);
+    assign rxData = rxFifo[rxRdPtr];
     
     // Pipeline for TSV TX latency simulation
-    reg [DATA_WIDTH-1:0] tx_pipe_data [0:LATENCY_CYCLES-1];
-    reg tx_pipe_valid [0:LATENCY_CYCLES-1];
+    reg [DATA_WIDTH-1:0] txPipeData [0:LATENCY_CYCLES-1];
+    reg txPipeValid [0:LATENCY_CYCLES-1];
     
-    assign tsv_out_valid = tx_pipe_valid[LATENCY_CYCLES-1];
-    assign tsv_out_data = tx_pipe_data[LATENCY_CYCLES-1];
+    assign tsvOutValid = txPipeValid[LATENCY_CYCLES-1];
+    assign tsvOutData = txPipeData[LATENCY_CYCLES-1];
     
     // Link Training State
-    reg [2:0] link_train_count;
-    reg link_up_reg;
-    assign link_up = link_up_reg;
+    reg [2:0] linkTrainCount;
+    reg linkUpReg;
+    assign linkUp = linkUpReg;
     
     integer i;
     
-    wire tx_push = tx_valid && tx_ready;
-    wire tx_pop = (tx_count > 0);
-    wire tx_bypass = (tx_push && tx_count == 0);
+    wire txPush = txValid && txReady;
+    wire txPop = (txCount > 0);
+    wire txBypass = (txPush && txCount == 0);
     
-    wire rx_push = tsv_in_valid && (rx_count < BUFFER_DEPTH);
-    wire rx_pop = rx_valid && rx_ready;
+    wire rxPush = tsvInValid && (rxCount < BUFFER_DEPTH);
+    wire rxPop = rxValid && rxReady;
     
     always @(posedge clk) begin
         if (reset) begin
-            tx_count <= 0;
-            tx_wr_ptr <= 0;
-            tx_rd_ptr <= 0;
-            rx_count <= 0;
-            rx_wr_ptr <= 0;
-            rx_rd_ptr <= 0;
+            txCount <= 0;
+            txWrPtr <= 0;
+            txRdPtr <= 0;
+            rxCount <= 0;
+            rxWrPtr <= 0;
+            rxRdPtr <= 0;
             
             for (i = 0; i < LATENCY_CYCLES; i = i + 1) begin
-                tx_pipe_valid[i] <= 0;
-                tx_pipe_data[i] <= 0;
+                txPipeValid[i] <= 0;
+                txPipeData[i] <= 0;
             end
             
-            perf_tx_count <= 0;
-            perf_rx_count <= 0;
-            perf_stall_cycles <= 0;
+            perfTxCount <= 0;
+            perfRxCount <= 0;
+            perfStallCycles <= 0;
             
-            link_train_count <= 0;
-            link_up_reg <= 0;
+            linkTrainCount <= 0;
+            linkUpReg <= 0;
         end else begin
             // Link Training Sequence
-            if (!link_up_reg) begin
-                if (link_train_count == 3) begin
-                    link_up_reg <= 1;
+            if (!linkUpReg) begin
+                if (linkTrainCount == 3) begin
+                    linkUpReg <= 1;
                 end else begin
-                    link_train_count <= link_train_count + 1;
+                    linkTrainCount <= linkTrainCount + 1;
                 end
             end
             
             // TX Path FIFO Writes
-            if (tx_push) begin
-                tx_fifo[tx_wr_ptr] <= tx_data;
-                tx_wr_ptr <= (tx_wr_ptr == BUFFER_DEPTH-1) ? 0 : tx_wr_ptr + 1;
-                perf_tx_count <= perf_tx_count + 1;
-            end else if (tx_valid) begin
-                perf_stall_cycles <= perf_stall_cycles + 1;
+            if (txPush) begin
+                txFifo[txWrPtr] <= txData;
+                txWrPtr <= (txWrPtr == BUFFER_DEPTH-1) ? 0 : txWrPtr + 1;
+                perfTxCount <= perfTxCount + 1;
+            end else if (txValid) begin
+                perfStallCycles <= perfStallCycles + 1;
             end
             
             // TX Path Pipeline Reads / Bypass
-            if (tx_pop) begin
-                 tx_pipe_valid[0] <= 1;
-                 tx_pipe_data[0] <= tx_fifo[tx_rd_ptr];
-                 tx_rd_ptr <= (tx_rd_ptr == BUFFER_DEPTH-1) ? 0 : tx_rd_ptr + 1;
-            end else if (tx_bypass) begin
-                 tx_pipe_valid[0] <= 1;
-                 tx_pipe_data[0] <= tx_data;
+            if (txPop) begin
+                 txPipeValid[0] <= 1;
+                 txPipeData[0] <= txFifo[txRdPtr];
+                 txRdPtr <= (txRdPtr == BUFFER_DEPTH-1) ? 0 : txRdPtr + 1;
+            end else if (txBypass) begin
+                 txPipeValid[0] <= 1;
+                 txPipeData[0] <= txData;
             end else begin
-                 tx_pipe_valid[0] <= 0;
+                 txPipeValid[0] <= 0;
             end
             
             // TX Count Update Logic
-            if (tx_push && !tx_pop && !tx_bypass) begin
-                tx_count <= tx_count + 1;
-            end else if (!tx_push && tx_pop) begin
-                tx_count <= tx_count - 1;
+            if (txPush && !txPop && !txBypass) begin
+                txCount <= txCount + 1;
+            end else if (!txPush && txPop) begin
+                txCount <= txCount - 1;
             end
             
             // Shift pipeline
             for (i = 1; i < LATENCY_CYCLES; i = i + 1) begin
-                tx_pipe_valid[i] <= tx_pipe_valid[i-1];
-                tx_pipe_data[i] <= tx_pipe_data[i-1];
+                txPipeValid[i] <= txPipeValid[i-1];
+                txPipeData[i] <= txPipeData[i-1];
             end
             
             // RX Path FIFO Writes
-            if (rx_push) begin
-                rx_fifo[rx_wr_ptr] <= tsv_in_data;
-                rx_wr_ptr <= (rx_wr_ptr == BUFFER_DEPTH-1) ? 0 : rx_wr_ptr + 1;
-                perf_rx_count <= perf_rx_count + 1;
+            if (rxPush) begin
+                rxFifo[rxWrPtr] <= tsvInData;
+                rxWrPtr <= (rxWrPtr == BUFFER_DEPTH-1) ? 0 : rxWrPtr + 1;
+                perfRxCount <= perfRxCount + 1;
             end
             
             // RX Path FIFO Reads
-            if (rx_pop) begin
-                rx_rd_ptr <= (rx_rd_ptr == BUFFER_DEPTH-1) ? 0 : rx_rd_ptr + 1;
+            if (rxPop) begin
+                rxRdPtr <= (rxRdPtr == BUFFER_DEPTH-1) ? 0 : rxRdPtr + 1;
             end
             
             // RX Count Update Logic
-            case ({rx_push, rx_pop})
-                2'b10: rx_count <= rx_count + 1;
-                2'b01: rx_count <= rx_count - 1;
+            case ({rxPush, rxPop})
+                2'b10: rxCount <= rxCount + 1;
+                2'b01: rxCount <= rxCount - 1;
                 default: ; // Unchanged on 00 or 11
             endcase
             

@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module core_fin_router #(
+module coreFinRouter #(
     parameter DATA_W    = 8,
     parameter ADDR_W    = 22,
     parameter FIN_ADDR  = 10,
@@ -12,74 +12,74 @@ module core_fin_router #(
     input  wire clk,
     input  wire reset,
 
-    input  wire              core_rd_valid,
-    input  wire [ADDR_W-1:0] core_rd_addr,
-    output wire              core_rd_ready,
-    output wire [DATA_W-1:0] core_rd_data,
+    input  wire              coreRdValid,
+    input  wire [ADDR_W-1:0] coreRdAddr,
+    output wire              coreRdReady,
+    output wire [DATA_W-1:0] coreRdData,
 
-    input  wire              core_wr_valid,
-    input  wire [ADDR_W-1:0] core_wr_addr,
-    input  wire [DATA_W-1:0] core_wr_data,
-    output wire              core_wr_ready,
+    input  wire              coreWrValid,
+    input  wire [ADDR_W-1:0] coreWrAddr,
+    input  wire [DATA_W-1:0] coreWrData,
+    output wire              coreWrReady,
 
-    input  wire [5:0]        face_present,
+    input  wire [5:0]        facePresent,
 
-    output reg  [NUM_CH-1:0] face_rd_valid [NUM_FACES-1:0],
-    output reg  [FIN_ADDR-1:0] face_rd_addr [NUM_FACES-1:0][NUM_CH-1:0],
-    input  wire [NUM_CH-1:0] face_rd_ready [NUM_FACES-1:0],
-    input  wire [DATA_W-1:0] face_rd_data  [NUM_FACES-1:0][NUM_CH-1:0],
+    output reg  [NUM_CH-1:0] faceRdValid [NUM_FACES-1:0],
+    output reg  [FIN_ADDR-1:0] faceRdAddr [NUM_FACES-1:0][NUM_CH-1:0],
+    input  wire [NUM_CH-1:0] faceRdReady [NUM_FACES-1:0],
+    input  wire [DATA_W-1:0] faceRdData  [NUM_FACES-1:0][NUM_CH-1:0],
 
-    output reg  [NUM_CH-1:0] face_wr_valid [NUM_FACES-1:0],
-    output reg  [FIN_ADDR-1:0] face_wr_addr [NUM_FACES-1:0][NUM_CH-1:0],
-    output reg  [DATA_W-1:0] face_wr_data  [NUM_FACES-1:0][NUM_CH-1:0],
-    input  wire [NUM_CH-1:0] face_wr_ready [NUM_FACES-1:0]
+    output reg  [NUM_CH-1:0] faceWrValid [NUM_FACES-1:0],
+    output reg  [FIN_ADDR-1:0] faceWrAddr [NUM_FACES-1:0][NUM_CH-1:0],
+    output reg  [DATA_W-1:0] faceWrData  [NUM_FACES-1:0][NUM_CH-1:0],
+    input  wire [NUM_CH-1:0] faceWrReady [NUM_FACES-1:0]
 );
 
-    wire [2:0] face_sel  = core_rd_valid ? core_rd_addr[ADDR_W-1:ADDR_W-3] :
-                           core_wr_valid ? core_wr_addr[ADDR_W-1:ADDR_W-3] : 3'd0;
+    wire [2:0] faceSel  = coreRdValid ? coreRdAddr[ADDR_W-1:ADDR_W-3] :
+                           coreWrValid ? coreWrAddr[ADDR_W-1:ADDR_W-3] : 3'd0;
 
-    wire [1:0] ch_sel    = core_rd_valid ? core_rd_addr[FIN_ADDR+1:FIN_ADDR] :
-                           core_wr_valid ? core_wr_addr[FIN_ADDR+1:FIN_ADDR] : 2'd0;
+    wire [1:0] chSel    = coreRdValid ? coreRdAddr[FIN_ADDR+1:FIN_ADDR] :
+                           coreWrValid ? coreWrAddr[FIN_ADDR+1:FIN_ADDR] : 2'd0;
 
-    wire [2:0] mapped_face = (face_sel < 3'd6) ? face_sel : 3'd0;
+    wire [2:0] mappedFace = (faceSel < 3'd6) ? faceSel : 3'd0;
 
-    reg rd_ack;
-    reg [DATA_W-1:0] rd_val;
-    reg wr_ack;
+    reg rdAck;
+    reg [DATA_W-1:0] rdVal;
+    reg wrAck;
 
     integer f, c;
     always @(*) begin
-        rd_ack = 0;
-        rd_val = {DATA_W{1'b0}};
-        wr_ack = 0;
+        rdAck = 0;
+        rdVal = {DATA_W{1'b0}};
+        wrAck = 0;
 
         for (f = 0; f < NUM_FACES; f = f + 1) begin
-            face_rd_valid[f] = {NUM_CH{1'b0}};
-            face_wr_valid[f] = {NUM_CH{1'b0}};
+            faceRdValid[f] = {NUM_CH{1'b0}};
+            faceWrValid[f] = {NUM_CH{1'b0}};
             for (c = 0; c < NUM_CH; c = c + 1) begin
-                face_rd_addr[f][c] = {FIN_ADDR{1'b0}};
-                face_wr_addr[f][c] = {FIN_ADDR{1'b0}};
-                face_wr_data[f][c] = {DATA_W{1'b0}};
+                faceRdAddr[f][c] = {FIN_ADDR{1'b0}};
+                faceWrAddr[f][c] = {FIN_ADDR{1'b0}};
+                faceWrData[f][c] = {DATA_W{1'b0}};
             end
         end
 
-        if (core_rd_valid && face_present[mapped_face]) begin
-            face_rd_valid[mapped_face][ch_sel] = 1'b1;
-            face_rd_addr[mapped_face][ch_sel]  = core_rd_addr[FIN_ADDR-1:0];
-            rd_ack = face_rd_ready[mapped_face][ch_sel];
-            rd_val = face_rd_data[mapped_face][ch_sel];
+        if (coreRdValid && facePresent[mappedFace]) begin
+            faceRdValid[mappedFace][chSel] = 1'b1;
+            faceRdAddr[mappedFace][chSel]  = coreRdAddr[FIN_ADDR-1:0];
+            rdAck = faceRdReady[mappedFace][chSel];
+            rdVal = faceRdData[mappedFace][chSel];
         end
 
-        if (core_wr_valid && face_present[mapped_face]) begin
-            face_wr_valid[mapped_face][ch_sel] = 1'b1;
-            face_wr_addr[mapped_face][ch_sel]  = core_wr_addr[FIN_ADDR-1:0];
-            face_wr_data[mapped_face][ch_sel]  = core_wr_data;
-            wr_ack = face_wr_ready[mapped_face][ch_sel];
+        if (coreWrValid && facePresent[mappedFace]) begin
+            faceWrValid[mappedFace][chSel] = 1'b1;
+            faceWrAddr[mappedFace][chSel]  = coreWrAddr[FIN_ADDR-1:0];
+            faceWrData[mappedFace][chSel]  = coreWrData;
+            wrAck = faceWrReady[mappedFace][chSel];
         end
     end
 
-    assign core_rd_ready = rd_ack;
-    assign core_rd_data  = rd_val;
-    assign core_wr_ready = wr_ack;
+    assign coreRdReady = rdAck;
+    assign coreRdData  = rdVal;
+    assign coreWrReady = wrAck;
 
 endmodule

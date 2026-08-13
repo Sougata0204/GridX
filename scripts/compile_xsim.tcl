@@ -34,7 +34,14 @@ set MESH_SIM_DIRS [list \
     [file join $PROJECT_ROOT memory_mesh sim] \
     [file join $PROJECT_ROOT memory_mesh tb] \
 ]
+set UVM_SIM_DIR [file join $SIM_DIR uvm]
 set WORK_DIR [file join $PROJECT_ROOT xsim_work]
+
+# Detect UVM mode based on top module name
+set UVM_MODE 0
+if {[string match "*uvm*" $TOP_MODULE]} {
+    set UVM_MODE 1
+}
 
 proc add_unique {var_name file_name} {
     upvar 1 $var_name files
@@ -90,6 +97,14 @@ if {[file exists $top_tb]} {
     }
 }
 
+# For UVM mode, add UVM source files
+if {$UVM_MODE} {
+    # Add UVM interfaces first (not inside package)
+    # gridx_if.sv is included by tb_uvm_top.sv, so we add the package and TB
+    add_unique files [file join $UVM_SIM_DIR gridx_uvm_pkg.sv]
+    add_unique files [file join $UVM_SIM_DIR tb_uvm_top.sv]
+}
+
 puts " GridX3 Vivado/XSim Compile"
 puts " Root: $PROJECT_ROOT"
 puts " Work: $WORK_DIR"
@@ -97,7 +112,10 @@ puts " Top:  $TOP_MODULE"
 puts " Files: [llength $files]"
 
 puts "\n>>> Running xvlog..."
-set xvlog_base [list xvlog -sv -work xil_defaultlib -d DEBUG -i $SRC_DIR -i $MESH_SRC_DIR]
+set xvlog_base [list xvlog -sv -work xil_defaultlib -d DEBUG -i $SRC_DIR -i $MESH_SRC_DIR -i $UVM_SIM_DIR]
+if {$UVM_MODE} {
+    lappend xvlog_base -L uvm
+}
 foreach file_name $files {
     puts "xvlog: $file_name"
     set xvlog_cmd $xvlog_base
@@ -115,6 +133,9 @@ if {[info exists ::env(XILINX_DEBUG_LEVEL)]} {
     set debug_level $::env(XILINX_DEBUG_LEVEL)
 }
 set xelab_cmd [list xelab -debug $debug_level xil_defaultlib.$TOP_MODULE -snapshot $TOP_MODULE]
+if {$UVM_MODE} {
+    lappend xelab_cmd -L uvm
+}
 if {[catch {exec {*}$xelab_cmd 2>@1} result]} {
     puts $result
     exit 1
@@ -132,6 +153,9 @@ if {$RUN_SIM} {
         puts $fp "quit"
         close $fp
         set xsim_cmd [list xsim $TOP_MODULE -tclbatch $run_script]
+        if {$UVM_MODE && $argc > 4 && [lindex $argv 4] ne ""} {
+            lappend xsim_cmd --testplusarg "UVM_TESTNAME=[lindex $argv 4]"
+        }
     }
     if {[catch {exec {*}$xsim_cmd 2>@1} result]} {
         puts $result

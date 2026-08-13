@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module vertical_memory_controller #(
+module verticalMemoryController #(
     parameter NUM_CORES = 4,
     parameter ADDR_WIDTH = 16,
     parameter DATA_WIDTH = 8,
@@ -12,73 +12,73 @@ module vertical_memory_controller #(
 ) (
     input wire clk,
     input wire reset,
-    input wire [NUM_CORES-1:0] core_req_valid,
-    input wire [NUM_CORES-1:0] core_req_write,
-    input wire [ADDR_WIDTH-1:0] core_req_addr [NUM_CORES-1:0],
-    input wire [DATA_WIDTH-1:0] core_req_data [NUM_CORES-1:0],
-    output reg [NUM_CORES-1:0] core_req_grant,
-    output reg [DATA_WIDTH-1:0] core_req_rdata [NUM_CORES-1:0],
-    output reg [NUM_CORES-1:0] core_req_ready,
-    output reg global_req_valid,
-    output reg global_req_write,
-    output reg [ADDR_WIDTH-1:0] global_req_addr,
-    output reg [DATA_WIDTH-1:0] global_req_data,
-    input wire global_req_ready,
-    input wire [DATA_WIDTH-1:0] global_req_rdata
+    input wire [NUM_CORES-1:0] coreReqValid,
+    input wire [NUM_CORES-1:0] coreReqWrite,
+    input wire [ADDR_WIDTH-1:0] coreReqAddr [NUM_CORES-1:0],
+    input wire [DATA_WIDTH-1:0] coreReqData [NUM_CORES-1:0],
+    output reg [NUM_CORES-1:0] coreReqGrant,
+    output reg [DATA_WIDTH-1:0] coreReqRdata [NUM_CORES-1:0],
+    output reg [NUM_CORES-1:0] coreReqReady,
+    output reg globalReqValid,
+    output reg globalReqWrite,
+    output reg [ADDR_WIDTH-1:0] globalReqAddr,
+    output reg [DATA_WIDTH-1:0] globalReqData,
+    input wire globalReqReady,
+    input wire [DATA_WIDTH-1:0] globalReqRdata
 );
-    reg [DATA_WIDTH-1:0] l2_memory [L2_DEPTH-1:0];
+    reg [DATA_WIDTH-1:0] l2Memory [L2_DEPTH-1:0];
     localparam CORE_ID_W = (NUM_CORES > 1) ? $clog2(NUM_CORES) : 1;
-    reg [CORE_ID_W-1:0] rr_ptr;
+    reg [CORE_ID_W-1:0] rrPtr;
     integer i;
-    reg [CORE_ID_W-1:0] winner_id;
+    reg [CORE_ID_W-1:0] winnerId;
     reg found;
     reg [CORE_ID_W-1:0] idx;
     reg [ADDR_WIDTH-1:0] addr;
     reg [ADDR_WIDTH-1:0] offset;
     always @(posedge clk) begin
         if (reset) begin
-            rr_ptr <= 0;
-            core_req_grant <= 0;
-            core_req_ready <= 0;
-            global_req_valid <= 0;
-            for (i=0; i<L2_DEPTH; i=i+1) l2_memory[i] = 0;
+            rrPtr <= 0;
+            coreReqGrant <= 0;
+            coreReqReady <= 0;
+            globalReqValid <= 0;
+            for (i=0; i<L2_DEPTH; i=i+1) l2Memory[i] = 0;
         end else begin
-            core_req_grant <= 0;
-            core_req_ready <= 0;
-            global_req_valid <= 0;
+            coreReqGrant <= 0;
+            coreReqReady <= 0;
+            globalReqValid <= 0;
             found = 0;
             for (i = 0; i < NUM_CORES; i = i + 1) begin
-                idx = (rr_ptr + i[CORE_ID_W-1:0]) % NUM_CORES;
-                if (core_req_valid[idx] && !found) begin
-                    winner_id = idx;
+                idx = (rrPtr + i[CORE_ID_W-1:0]) % NUM_CORES;
+                if (coreReqValid[idx] && !found) begin
+                    winnerId = idx;
                     found = 1;
                 end
             end
             if (found) begin
-                addr = core_req_addr[winner_id];
+                addr = coreReqAddr[winnerId];
                 if (addr >= L2_BASE_ADDR && addr <= L2_LIMIT_ADDR) begin
                     offset = addr - L2_BASE_ADDR;
-                    if (core_req_write[winner_id]) begin
-                        l2_memory[offset] <= core_req_data[winner_id];
+                    if (coreReqWrite[winnerId]) begin
+                        l2Memory[offset] <= coreReqData[winnerId];
                     end else begin
-                        core_req_rdata[winner_id] <= l2_memory[offset];
+                        coreReqRdata[winnerId] <= l2Memory[offset];
                     end
-                    core_req_ready[winner_id] <= 1;
-                    core_req_grant[winner_id] <= 1;
+                    coreReqReady[winnerId] <= 1;
+                    coreReqGrant[winnerId] <= 1;
                 end else begin
-                    global_req_valid <= 1;
-                    global_req_write <= core_req_write[winner_id];
-                    global_req_addr <= addr;
-                    global_req_data <= core_req_data[winner_id];
-                    if (global_req_ready) begin
-                        core_req_ready[winner_id] <= 1;
-                        core_req_rdata[winner_id] <= global_req_rdata;
+                    globalReqValid <= 1;
+                    globalReqWrite <= coreReqWrite[winnerId];
+                    globalReqAddr <= addr;
+                    globalReqData <= coreReqData[winnerId];
+                    if (globalReqReady) begin
+                        coreReqReady[winnerId] <= 1;
+                        coreReqRdata[winnerId] <= globalReqRdata;
                     end else begin
-                        if (!global_req_ready) found = 0;
+                        if (!globalReqReady) found = 0;
                     end
                 end
-                if (core_req_ready[winner_id]) begin
-                    rr_ptr <= rr_ptr + 1;
+                if (coreReqReady[winnerId]) begin
+                    rrPtr <= rrPtr + 1;
                 end
             end
         end

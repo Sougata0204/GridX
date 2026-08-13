@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module clk_domain_ctrl #(
+module clkDomainCtrl #(
     parameter NUM_CLUSTERS      = 8,
     parameter CORES_PER_CLUSTER = 4,
     parameter SAMPLE_WINDOW     = 1024,
@@ -13,19 +13,19 @@ module clk_domain_ctrl #(
     input  wire clk,
     input  wire reset,
 
-    input  wire [NUM_CLUSTERS-1:0] cluster_alu_active,
-    input  wire [NUM_CLUSTERS-1:0] cluster_tensor_active,
-    input  wire [NUM_CLUSTERS-1:0] cluster_stall_mem,
+    input  wire [NUM_CLUSTERS-1:0] clusterAluActive,
+    input  wire [NUM_CLUSTERS-1:0] clusterTensorActive,
+    input  wire [NUM_CLUSTERS-1:0] clusterStallMem,
 
-    input  wire [6:0]              cluster_temp [NUM_CLUSTERS-1:0],
-    input  wire [6:0]              thermal_limit,
+    input  wire [6:0]              clusterTemp [NUM_CLUSTERS-1:0],
+    input  wire [6:0]              thermalLimit,
 
-    output reg  [1:0]              cluster_perf_level [NUM_CLUSTERS-1:0],
-    output reg  [NUM_CLUSTERS-1:0] cluster_clock_enable,
-    output reg  [NUM_CLUSTERS-1:0] cluster_power_gate,
+    output reg  [1:0]              clusterPerfLevel [NUM_CLUSTERS-1:0],
+    output reg  [NUM_CLUSTERS-1:0] clusterClockEnable,
+    output reg  [NUM_CLUSTERS-1:0] clusterPowerGate,
 
-    output reg  [NUM_CLUSTERS-1:0] cluster_throttled,
-    output wire [31:0]             total_gated_cycles
+    output reg  [NUM_CLUSTERS-1:0] clusterThrottled,
+    output wire [31:0]             totalGatedCycles
 );
 
     localparam [1:0] PERF_IDLE = 2'b00;
@@ -33,65 +33,65 @@ module clk_domain_ctrl #(
     localparam [1:0] PERF_MED  = 2'b10;
     localparam [1:0] PERF_HIGH = 2'b11;
 
-    reg [15:0] active_cycles  [NUM_CLUSTERS-1:0];
-    reg [15:0] sample_counter;
-    reg [31:0] gated_cycles;
-    assign total_gated_cycles = gated_cycles;
+    reg [15:0] activeCycles  [NUM_CLUSTERS-1:0];
+    reg [15:0] sampleCounter;
+    reg [31:0] gatedCycles;
+    assign totalGatedCycles = gatedCycles;
 
     integer c;
 
     always @(posedge clk) begin
         if (reset) begin
-            sample_counter <= 0;
-            gated_cycles   <= 0;
+            sampleCounter <= 0;
+            gatedCycles   <= 0;
             for (c = 0; c < NUM_CLUSTERS; c = c + 1) begin
-                active_cycles[c]      <= 0;
-                cluster_perf_level[c] <= PERF_MED;
-                cluster_clock_enable[c] <= 1;
-                cluster_power_gate[c]   <= 0;
-                cluster_throttled[c]    <= 0;
+                activeCycles[c]      <= 0;
+                clusterPerfLevel[c] <= PERF_MED;
+                clusterClockEnable[c] <= 1;
+                clusterPowerGate[c]   <= 0;
+                clusterThrottled[c]    <= 0;
             end
         end else begin
-            sample_counter <= sample_counter + 1;
+            sampleCounter <= sampleCounter + 1;
 
             for (c = 0; c < NUM_CLUSTERS; c = c + 1) begin
-                if (cluster_alu_active[c] || cluster_tensor_active[c])
-                    active_cycles[c] <= active_cycles[c] + 1;
+                if (clusterAluActive[c] || clusterTensorActive[c])
+                    activeCycles[c] <= activeCycles[c] + 1;
 
-                if (!cluster_clock_enable[c])
-                    gated_cycles <= gated_cycles + 1;
+                if (!clusterClockEnable[c])
+                    gatedCycles <= gatedCycles + 1;
             end
 
-            if (sample_counter >= SAMPLE_WINDOW) begin
-                sample_counter <= 0;
+            if (sampleCounter >= SAMPLE_WINDOW) begin
+                sampleCounter <= 0;
 
                 for (c = 0; c < NUM_CLUSTERS; c = c + 1) begin
 
-                    if (cluster_temp[c] >= thermal_limit) begin
+                    if (clusterTemp[c] >= thermalLimit) begin
 
-                        cluster_perf_level[c] <= PERF_LOW;
-                        cluster_throttled[c]  <= 1;
+                        clusterPerfLevel[c] <= PERF_LOW;
+                        clusterThrottled[c]  <= 1;
                     end else begin
-                        cluster_throttled[c] <= 0;
+                        clusterThrottled[c] <= 0;
 
-                        if (active_cycles[c] > ((UP_THRESHOLD * SAMPLE_WINDOW) / 100)) begin
+                        if (activeCycles[c] > ((UP_THRESHOLD * SAMPLE_WINDOW) / 100)) begin
 
-                            if (cluster_perf_level[c] < PERF_HIGH)
-                                cluster_perf_level[c] <= cluster_perf_level[c] + 1;
-                        end else if (active_cycles[c] < ((DOWN_THRESHOLD * SAMPLE_WINDOW) / 100)) begin
+                            if (clusterPerfLevel[c] < PERF_HIGH)
+                                clusterPerfLevel[c] <= clusterPerfLevel[c] + 1;
+                        end else if (activeCycles[c] < ((DOWN_THRESHOLD * SAMPLE_WINDOW) / 100)) begin
 
-                            if (cluster_perf_level[c] > PERF_IDLE)
-                                cluster_perf_level[c] <= cluster_perf_level[c] - 1;
+                            if (clusterPerfLevel[c] > PERF_IDLE)
+                                clusterPerfLevel[c] <= clusterPerfLevel[c] - 1;
                         end
 
                     end
 
-                    cluster_clock_enable[c] <= (cluster_perf_level[c] != PERF_IDLE);
+                    clusterClockEnable[c] <= (clusterPerfLevel[c] != PERF_IDLE);
 
-                    cluster_power_gate[c] <= (cluster_perf_level[c] == PERF_IDLE) &&
-                                              (active_cycles[c] == 0);
+                    clusterPowerGate[c] <= (clusterPerfLevel[c] == PERF_IDLE) &&
+                                              (activeCycles[c] == 0);
 
-                    active_cycles[c] <= 0;
+                    activeCycles[c] <= 0;
                 end
             end
         end

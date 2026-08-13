@@ -9,77 +9,77 @@ module scoreboard #(
 ) (
     input wire clk,
     input wire reset,
-    input wire query_valid,
-    input wire [WARP_ID_WIDTH-1:0] query_warp_id,
-    input wire [3:0] query_rs,
-    input wire [3:0] query_rt,
-    input wire [3:0] query_rd,
-    output wire query_hazard,
-    output wire [1:0] query_hazard_type,
-    input wire write_pending_set,
-    input wire [WARP_ID_WIDTH-1:0] write_pending_warp,
-    input wire [3:0] write_pending_reg,
-    input wire write_complete,
-    input wire [WARP_ID_WIDTH-1:0] write_complete_warp,
-    input wire [3:0] write_complete_reg,
-    input wire mem_load_start,
-    input wire [WARP_ID_WIDTH-1:0] mem_load_warp,
-    input wire [3:0] mem_load_dest_reg,
-    input wire mem_load_complete,
-    input wire [WARP_ID_WIDTH-1:0] mem_load_complete_warp,
-    input wire [3:0] mem_load_complete_reg,
-    input wire tensor_op_start,
-    input wire [WARP_ID_WIDTH-1:0] tensor_op_warp,
-    input wire tensor_op_complete,
-    input wire [WARP_ID_WIDTH-1:0] tensor_op_complete_warp,
-    output reg [31:0] perf_false_stalls_avoided,
-    output reg [31:0] perf_true_dependency_stalls
+    input wire queryValid,
+    input wire [WARP_ID_WIDTH-1:0] queryWarpId,
+    input wire [3:0] queryRs,
+    input wire [3:0] queryRt,
+    input wire [3:0] queryRd,
+    output wire queryHazard,
+    output wire [1:0] queryHazardType,
+    input wire writePendingSet,
+    input wire [WARP_ID_WIDTH-1:0] writePendingWarp,
+    input wire [3:0] writePendingReg,
+    input wire writeComplete,
+    input wire [WARP_ID_WIDTH-1:0] writeCompleteWarp,
+    input wire [3:0] writeCompleteReg,
+    input wire memLoadStart,
+    input wire [WARP_ID_WIDTH-1:0] memLoadWarp,
+    input wire [3:0] memLoadDestReg,
+    input wire memLoadComplete,
+    input wire [WARP_ID_WIDTH-1:0] memLoadCompleteWarp,
+    input wire [3:0] memLoadCompleteReg,
+    input wire tensorOpStart,
+    input wire [WARP_ID_WIDTH-1:0] tensorOpWarp,
+    input wire tensorOpComplete,
+    input wire [WARP_ID_WIDTH-1:0] tensorOpCompleteWarp,
+    output reg [31:0] perfFalseStallsAvoided,
+    output reg [31:0] perfTrueDependencyStalls
 );
-    reg [NUM_REGS-1:0] reg_pending [NUM_WARPS-1:0];
-    reg [NUM_REGS-1:0] mem_pending [NUM_WARPS-1:0];
-    reg [NUM_WARPS-1:0] tensor_in_flight;
+    reg [NUM_REGS-1:0] regPending [NUM_WARPS-1:0];
+    reg [NUM_REGS-1:0] memPending [NUM_WARPS-1:0];
+    reg [NUM_WARPS-1:0] tensorInFlight;
     integer w, r;
-    wire rs_hazard = reg_pending[query_warp_id][query_rs] || mem_pending[query_warp_id][query_rs];
-    wire rt_hazard = reg_pending[query_warp_id][query_rt] || mem_pending[query_warp_id][query_rt];
-    wire rd_hazard = reg_pending[query_warp_id][query_rd] || mem_pending[query_warp_id][query_rd];
-    wire tensor_hazard = tensor_in_flight[query_warp_id];
-    assign query_hazard = query_valid && (rs_hazard || rt_hazard || rd_hazard || tensor_hazard);
-    assign query_hazard_type = (rs_hazard || rt_hazard) ? 2'b01 :
-                               (rd_hazard) ? 2'b10 :
+    wire rsHazard = regPending[queryWarpId][queryRs] || memPending[queryWarpId][queryRs];
+    wire rtHazard = regPending[queryWarpId][queryRt] || memPending[queryWarpId][queryRt];
+    wire rdHazard = regPending[queryWarpId][queryRd] || memPending[queryWarpId][queryRd];
+    wire tensorHazard = tensorInFlight[queryWarpId];
+    assign queryHazard = queryValid && (rsHazard || rtHazard || rdHazard || tensorHazard);
+    assign queryHazardType = (rsHazard || rtHazard) ? 2'b01 :
+                               (rdHazard) ? 2'b10 :
                                2'b00;
     always @(posedge clk) begin
         if (reset) begin
             for (w = 0; w < NUM_WARPS; w = w + 1) begin
-                reg_pending[w] <= 0;
-                mem_pending[w] <= 0;
+                regPending[w] <= 0;
+                memPending[w] <= 0;
             end
-            tensor_in_flight <= 0;
-            perf_false_stalls_avoided <= 0;
-            perf_true_dependency_stalls <= 0;
+            tensorInFlight <= 0;
+            perfFalseStallsAvoided <= 0;
+            perfTrueDependencyStalls <= 0;
         end else begin
-            if (write_pending_set) begin
-                reg_pending[write_pending_warp][write_pending_reg] <= 1;
+            if (writePendingSet) begin
+                regPending[writePendingWarp][writePendingReg] <= 1;
             end
-            if (write_complete) begin
-                reg_pending[write_complete_warp][write_complete_reg] <= 0;
+            if (writeComplete) begin
+                regPending[writeCompleteWarp][writeCompleteReg] <= 0;
             end
-            if (mem_load_start) begin
-                mem_pending[mem_load_warp][mem_load_dest_reg] <= 1;
+            if (memLoadStart) begin
+                memPending[memLoadWarp][memLoadDestReg] <= 1;
             end
-            if (mem_load_complete) begin
-                mem_pending[mem_load_complete_warp][mem_load_complete_reg] <= 0;
+            if (memLoadComplete) begin
+                memPending[memLoadCompleteWarp][memLoadCompleteReg] <= 0;
             end
-            if (tensor_op_start) begin
-                tensor_in_flight[tensor_op_warp] <= 1;
+            if (tensorOpStart) begin
+                tensorInFlight[tensorOpWarp] <= 1;
             end
-            if (tensor_op_complete) begin
-                tensor_in_flight[tensor_op_complete_warp] <= 0;
+            if (tensorOpComplete) begin
+                tensorInFlight[tensorOpCompleteWarp] <= 0;
             end
-            if (query_valid) begin
-                if (query_hazard) begin
-                    perf_true_dependency_stalls <= perf_true_dependency_stalls + 1;
+            if (queryValid) begin
+                if (queryHazard) begin
+                    perfTrueDependencyStalls <= perfTrueDependencyStalls + 1;
                 end else begin
-                    perf_false_stalls_avoided <= perf_false_stalls_avoided + 1;
+                    perfFalseStallsAvoided <= perfFalseStallsAvoided + 1;
                 end
             end
         end

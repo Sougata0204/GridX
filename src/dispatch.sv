@@ -1,6 +1,6 @@
 // Thread Block Dispatcher & Recycling Unit
 // This module dispatches thread blocks to available physical cores.
-// I updated the block allocation logic to track core_done signals and issue remaining blocks
+// I updated the block allocation logic to track coreDone signals and issue remaining blocks
 // dynamically when cores finish, enabling workload scaling beyond physical core count.
 
 `default_nettype none
@@ -13,82 +13,79 @@ module dispatch #(
     input wire clk,
     input wire reset,
     input wire start,
-    input wire kernel_running,
-    input wire [15:0] thread_count,
-    input wire [NUM_CORES-1:0] core_done,
-    output reg [NUM_CORES-1:0] core_start,
-    output reg [NUM_CORES-1:0] core_reset,
-    output reg [7:0] core_block_id [NUM_CORES-1:0],
-    output reg [$clog2(THREADS_PER_BLOCK):0] core_thread_count [NUM_CORES-1:0],
-    output wire [15:0] blocks_dispatched_out,
-    output wire [15:0] blocks_done_out,
-    output wire [15:0] total_blocks_out,
-    output wire all_blocks_dispatched,
-    output wire all_blocks_done
+    input wire kernelRunning,
+    input wire [15:0] threadCount,
+    input wire [NUM_CORES-1:0] coreDone,
+    output reg [NUM_CORES-1:0] coreStart,
+    output reg [NUM_CORES-1:0] coreReset,
+    output reg [7:0] coreBlockId [NUM_CORES-1:0],
+    output reg [$clog2(THREADS_PER_BLOCK):0] coreThreadCount [NUM_CORES-1:0],
+    output wire [15:0] blocksDispatchedOut,
+    output wire [15:0] blocksDoneOut,
+    output wire [15:0] totalBlocksOut,
+    output wire allBlocksDispatched,
+    output wire allBlocksDone
 );
-    wire [15:0] total_blocks;
-    assign total_blocks = (thread_count > 0) ?
-                          (thread_count + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK :
+    wire [15:0] totalBlocks;
+    assign totalBlocks = (threadCount > 0) ?
+                          (threadCount + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK :
                           16'd0;
-    reg [15:0] blocks_dispatched;
-    reg [15:0] blocks_done;
-    reg start_execution;
-    reg [15:0] next_blocks_dispatched;
-    reg [15:0] next_blocks_done;
+    reg [15:0] blocksDispatched;
+    reg [15:0] blocksDone;
+    reg startExecution;
+    reg [15:0] nextBlocksDispatched;
+    reg [15:0] nextBlocksDone;
     integer i;
-    assign blocks_dispatched_out = blocks_dispatched;
-    assign blocks_done_out = blocks_done;
-    assign total_blocks_out = total_blocks;
-    assign all_blocks_dispatched = (blocks_dispatched >= total_blocks) && (total_blocks > 0);
-    assign all_blocks_done = (blocks_done >= total_blocks) && (total_blocks > 0);
+    assign blocksDispatchedOut = blocksDispatched;
+    assign blocksDoneOut = blocksDone;
+    assign totalBlocksOut = totalBlocks;
+    assign allBlocksDispatched = (blocksDispatched >= totalBlocks) && (totalBlocks > 0);
+    assign allBlocksDone = (blocksDone >= totalBlocks) && (totalBlocks > 0);
     always @(posedge clk) begin
         if (reset) begin
-            blocks_dispatched <= 0;
-            blocks_done <= 0;
-            start_execution <= 0;
+            blocksDispatched <= 0;
+            blocksDone <= 0;
+            startExecution <= 0;
             for (i = 0; i < NUM_CORES; i = i + 1) begin
-                core_start[i] <= 0;
-                core_reset[i] <= 1;
-                core_block_id[i] <= 0;
-                core_thread_count[i] <= THREADS_PER_BLOCK;
+                coreStart[i] <= 0;
+                coreReset[i] <= 1;
+                coreBlockId[i] <= 0;
+                coreThreadCount[i] <= THREADS_PER_BLOCK;
             end
-        end else if (kernel_running) begin
-            next_blocks_dispatched = blocks_dispatched;
-            next_blocks_done = blocks_done;
-            if (!start_execution) begin
-                start_execution <= 1;
-                for (i = 0; i < NUM_CORES; i = i + 1) begin
-                    core_reset[i] <= 1;
-                end
+        end else if (kernelRunning) begin
+            nextBlocksDispatched = blocksDispatched;
+            nextBlocksDone = blocksDone;
+            if (!startExecution) begin
+                startExecution <= 1;
             end
             for (i = 0; i < NUM_CORES; i = i + 1) begin
-                if (core_reset[i]) begin
-                    core_reset[i] <= 0;
-                    if (next_blocks_dispatched < total_blocks) begin
-                        core_start[i] <= 1;
-                        core_block_id[i] <= next_blocks_dispatched[7:0];
-                        core_thread_count[i] <= (next_blocks_dispatched == total_blocks - 1)
-                            ? thread_count - (next_blocks_dispatched * THREADS_PER_BLOCK)
+                if (!startExecution || coreReset[i]) begin
+                    if (nextBlocksDispatched < totalBlocks) begin
+                        coreReset[i] <= 0;
+                        coreStart[i] <= 1;
+                        coreBlockId[i] <= nextBlocksDispatched[7:0];
+                        coreThreadCount[i] <= (nextBlocksDispatched == totalBlocks - 1)
+                            ? threadCount - (nextBlocksDispatched * THREADS_PER_BLOCK)
                             : THREADS_PER_BLOCK;
-                        next_blocks_dispatched = next_blocks_dispatched + 1;
+                        nextBlocksDispatched = nextBlocksDispatched + 1;
                     end
                 end
             end
             for (i = 0; i < NUM_CORES; i = i + 1) begin
-                if (core_start[i] && core_done[i]) begin
-                    core_reset[i] <= 1;
-                    core_start[i] <= 0;
-                    next_blocks_done = next_blocks_done + 1;
+                if (coreStart[i] && coreDone[i]) begin
+                    coreReset[i] <= 1;
+                    coreStart[i] <= 0;
+                    nextBlocksDone = nextBlocksDone + 1;
                 end
             end
-            blocks_dispatched <= next_blocks_dispatched;
-            blocks_done <= next_blocks_done;
-        end else if (!kernel_running) begin
+            blocksDispatched <= nextBlocksDispatched;
+            blocksDone <= nextBlocksDone;
+        end else if (!kernelRunning) begin
             for (i = 0; i < NUM_CORES; i = i + 1) begin
-                if (core_start[i] && core_done[i]) begin
-                    core_reset[i] <= 1;
-                    core_start[i] <= 0;
-                    blocks_done <= blocks_done + 1;
+                if (coreStart[i] && coreDone[i]) begin
+                    coreReset[i] <= 1;
+                    coreStart[i] <= 0;
+                    blocksDone <= blocksDone + 1;
                 end
             end
         end

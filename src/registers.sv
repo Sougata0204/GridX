@@ -1,76 +1,79 @@
-// Thread Register File & Identity Registers
-// Provides per-thread working registers (r1-r12) and hardwired identity registers (r0=0, r13=block_id, r14=TPB, r15=thread_id).
-
-
 `default_nettype none
 `timescale 1ns/1ns
 
+// my registers store thread data and identity
 module registers #(
-    parameter THREADS_PER_BLOCK = 4,
-    parameter THREAD_ID = 0,
-    parameter DATA_BITS = 16
+    parameter ThreadsPerBlock = 4,
+    parameter ThreadId = 0,
+    parameter DataBits = 16
 ) (
     input wire clk,
     input wire reset,
     input wire enable,
-    input reg [7:0] block_id,
-    input reg [2:0] core_state,
-    input reg [3:0] decoded_rd_address,
-    input reg [3:0] decoded_rs_address,
-    input reg [3:0] decoded_rt_address,
-    input reg decoded_reg_write_enable,
-    input reg [1:0] decoded_reg_input_mux,
-    input reg [DATA_BITS-1:0] decoded_immediate,
-    input wire force_reg_write_enable,
-    input wire [3:0] force_reg_write_dest,
-    input wire [DATA_BITS-1:0] force_reg_write_data,
-    input reg [DATA_BITS-1:0] alu_out,
-    input reg [DATA_BITS-1:0] lsu_out,
-    output reg [DATA_BITS-1:0] rs,
-    output reg [DATA_BITS-1:0] rt,
-    output reg [DATA_BITS-1:0] rd_val
+    input reg [7:0] blockId,
+    input reg [2:0] coreState,
+    input reg [3:0] decodedRdAddress,
+    input reg [3:0] decodedRsAddress,
+    input reg [3:0] decodedRtAddress,
+    input reg decodedRegWriteEnable,
+    input reg [1:0] decodedRegInputMux,
+    input reg [DataBits-1:0] decodedImmediate,
+    input wire forceRegWriteEnable,
+    input wire [3:0] forceRegWriteDest,
+    input wire [DataBits-1:0] forceRegWriteData,
+    input reg [DataBits-1:0] aluOut,
+    input reg [DataBits-1:0] lsuOut,
+    output reg [DataBits-1:0] rs,
+    output reg [DataBits-1:0] rt,
+    output reg [DataBits-1:0] rdVal
 );
-    localparam ARITHMETIC = 2'b00,
-        MEMORY = 2'b01,
-        CONSTANT = 2'b10;
-    reg [DATA_BITS-1:0] registers[15:0];
+    localparam Arithmetic = 2'b00,
+        Memory = 2'b01,
+        Constant = 2'b10;
+        
+    reg [DataBits-1:0] registers[15:0];
+    
     always @(*) begin
-        rs = (decoded_rs_address == 4'b0000) ? {DATA_BITS{1'b0}} : registers[decoded_rs_address];
-        rt = (decoded_rt_address == 4'b0000) ? {DATA_BITS{1'b0}} : registers[decoded_rt_address];
-        rd_val = (decoded_rd_address == 4'b0000) ? {DATA_BITS{1'b0}} : registers[decoded_rd_address];
+        rs = (decodedRsAddress == 4'b0000) ? {DataBits{1'b0}} : registers[decodedRsAddress];
+        rt = (decodedRtAddress == 4'b0000) ? {DataBits{1'b0}} : registers[decodedRtAddress];
+        rdVal = (decodedRdAddress == 4'b0000) ? {DataBits{1'b0}} : registers[decodedRdAddress];
     end
+    
     integer i;
+    
     always @(posedge clk) begin
         if (reset) begin
             for (i = 0; i < 16; i = i + 1) begin
-                registers[i] <= {DATA_BITS{1'b0}};
+                registers[i] <= {DataBits{1'b0}};
             end
-            registers[13] <= {{(DATA_BITS-8){1'b0}}, 8'b0};
-            registers[14] <= {{(DATA_BITS-8){1'b0}}, THREADS_PER_BLOCK[7:0]};
-            registers[15] <= {{(DATA_BITS-8){1'b0}}, THREAD_ID[7:0]};
+            registers[13] <= {{(DataBits-8){1'b0}}, 8'b0};
+            registers[14] <= {{(DataBits-8){1'b0}}, ThreadsPerBlock[7:0]};
+            registers[15] <= {{(DataBits-8){1'b0}}, ThreadId[7:0]};
         end else if (enable) begin
-            registers[13] <= {{(DATA_BITS-8){1'b0}}, block_id};
-            if (force_reg_write_enable) begin
-                 if (force_reg_write_dest != 4'b0000) begin
-                     registers[force_reg_write_dest] <= force_reg_write_data;
+            registers[13] <= {{(DataBits-8){1'b0}}, blockId};
+            if (forceRegWriteEnable) begin
+                 if (forceRegWriteDest != 4'b0000) begin
+                     registers[forceRegWriteDest] <= forceRegWriteData;
                  end
             end
-            else if (core_state == 3'b110) begin
-                if (decoded_reg_write_enable && decoded_rd_address < 13 && decoded_rd_address != 0) begin
+            else if (coreState == 3'b110) begin
+                if (decodedRegWriteEnable && decodedRdAddress < 13 && decodedRdAddress != 0) begin
+                    // synthesis translateOff
                     $display("[REG_WRITE] Cycle %d: Thread %d: Writing reg %d with %h (mux=%d, alu=%h, lsu=%h, imm=%h)",
-                     $time, THREAD_ID, decoded_rd_address,
-                             (decoded_reg_input_mux == 2'b00) ? alu_out :
-                             (decoded_reg_input_mux == 2'b01) ? lsu_out : decoded_immediate,
-                             decoded_reg_input_mux, alu_out, lsu_out, decoded_immediate);
-                    case (decoded_reg_input_mux)
-                        ARITHMETIC: begin
-                            registers[decoded_rd_address] <= alu_out;
+                             $time, ThreadId, decodedRdAddress,
+                             (decodedRegInputMux == 2'b00) ? aluOut :
+                             (decodedRegInputMux == 2'b01) ? lsuOut : decodedImmediate,
+                             decodedRegInputMux, aluOut, lsuOut, decodedImmediate);
+                    // synthesis translateOn
+                    case (decodedRegInputMux)
+                        Arithmetic: begin
+                            registers[decodedRdAddress] <= aluOut;
                         end
-                        MEMORY: begin
-                            registers[decoded_rd_address] <= lsu_out;
+                        Memory: begin
+                            registers[decodedRdAddress] <= lsuOut;
                         end
-                        CONSTANT: begin
-                            registers[decoded_rd_address] <= decoded_immediate;
+                        Constant: begin
+                            registers[decodedRdAddress] <= decodedImmediate;
                         end
                     endcase
                 end

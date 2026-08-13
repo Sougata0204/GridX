@@ -62,6 +62,10 @@ package gridx_mem_pkg;
         logic [COORD_Z_W-1:0] z;
     } coord_t;
 
+    // Fixed header fields: pkt_type(3) + vc_id(2) + src(COORD_W) + dst(COORD_W) + tx_id(5) + ctrl(4) + mcast(4) + pf(2)
+    localparam int HEAD_FLIT_FIXED_W = 3 + VC_ID_W + 2*(COORD_X_W + COORD_Y_W + COORD_Z_W) + 5 + 4 + 4 + 2;
+    localparam int HEAD_FLIT_META_W  = 128 - HEAD_FLIT_FIXED_W;
+
     typedef struct packed {
         pkt_type_e              pkt_type;
         logic [VC_ID_W-1:0]     vc_id;
@@ -71,7 +75,7 @@ package gridx_mem_pkg;
         logic [3:0]             ctrl_flags;
         logic [3:0]             mcast_grp;
         logic [1:0]             pf_hint;
-        logic [479:0]           metadata;
+        logic [HEAD_FLIT_META_W-1:0] metadata;
     } head_flit_t;
 
     typedef struct packed {

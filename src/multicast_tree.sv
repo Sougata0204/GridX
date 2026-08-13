@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module multicast_tree #(
+module multicastTree #(
     parameter NUM_GROUPS   = 16,
     parameter MAX_TARGETS  = 8,
     parameter FLIT_WIDTH   = 512,
@@ -11,89 +11,89 @@ module multicast_tree #(
     input  wire clk,
     input  wire reset,
 
-    input  wire                         cfg_valid,
-    input  wire [GROUP_ID_W-1:0]        cfg_group_id,
-    input  wire [MAX_TARGETS-1:0]       cfg_target_mask,
-    input  wire                         cfg_enable,
+    input  wire                         cfgValid,
+    input  wire [GROUP_ID_W-1:0]        cfgGroupId,
+    input  wire [MAX_TARGETS-1:0]       cfgTargetMask,
+    input  wire                         cfgEnable,
 
-    input  wire                         flit_in_valid,
-    input  wire [FLIT_WIDTH-1:0]        flit_in_data,
-    input  wire [GROUP_ID_W-1:0]        flit_in_group_id,
-    input  wire                         flit_in_is_multicast,
+    input  wire                         flitInValid,
+    input  wire [FLIT_WIDTH-1:0]        flitInData,
+    input  wire [GROUP_ID_W-1:0]        flitInGroupId,
+    input  wire                         flitInIsMulticast,
 
-    output reg                          flit_out_valid,
-    output reg  [FLIT_WIDTH-1:0]        flit_out_data,
-    output reg  [$clog2(MAX_TARGETS)-1:0] flit_out_target_id,
-    input  wire                         flit_out_ready,
+    output reg                          flitOutValid,
+    output reg  [FLIT_WIDTH-1:0]        flitOutData,
+    output reg  [$clog2(MAX_TARGETS)-1:0] flitOutTargetId,
+    input  wire                         flitOutReady,
 
     output wire                         busy,
-    output reg  [15:0]                  multicast_count
+    output reg  [15:0]                  multicastCount
 );
 
-    reg [MAX_TARGETS-1:0] group_mask   [NUM_GROUPS-1:0];
-    reg [NUM_GROUPS-1:0]  group_active;
+    reg [MAX_TARGETS-1:0] groupMask   [NUM_GROUPS-1:0];
+    reg [NUM_GROUPS-1:0]  groupActive;
 
-    reg                          repl_active;
-    reg [FLIT_WIDTH-1:0]         repl_data;
-    reg [MAX_TARGETS-1:0]        repl_remaining;
-    reg [$clog2(MAX_TARGETS)-1:0] repl_current;
+    reg                          replActive;
+    reg [FLIT_WIDTH-1:0]         replData;
+    reg [MAX_TARGETS-1:0]        replRemaining;
+    reg [$clog2(MAX_TARGETS)-1:0] replCurrent;
 
-    assign busy = repl_active;
+    assign busy = replActive;
 
     integer i;
 
-    reg [$clog2(MAX_TARGETS)-1:0] next_target;
-    reg                           next_found;
+    reg [$clog2(MAX_TARGETS)-1:0] nextTarget;
+    reg                           nextFound;
     always @(*) begin
-        next_found = 0;
-        next_target = 0;
+        nextFound = 0;
+        nextTarget = 0;
         for (i = 0; i < MAX_TARGETS; i = i + 1) begin
-            if (repl_remaining[i] && !next_found) begin
-                next_found = 1;
-                next_target = i;
+            if (replRemaining[i] && !nextFound) begin
+                nextFound = 1;
+                nextTarget = i;
             end
         end
     end
 
     always @(posedge clk) begin
         if (reset) begin
-            repl_active <= 0;
-            flit_out_valid <= 0;
-            multicast_count <= 0;
-            group_active <= 0;
+            replActive <= 0;
+            flitOutValid <= 0;
+            multicastCount <= 0;
+            groupActive <= 0;
             for (i = 0; i < NUM_GROUPS; i = i + 1) begin
-                group_mask[i] <= 0;
+                groupMask[i] <= 0;
             end
         end else begin
-            flit_out_valid <= 0;
+            flitOutValid <= 0;
 
-            if (cfg_valid) begin
-                group_mask[cfg_group_id] <= cfg_target_mask;
-                group_active[cfg_group_id] <= cfg_enable;
+            if (cfgValid) begin
+                groupMask[cfgGroupId] <= cfgTargetMask;
+                groupActive[cfgGroupId] <= cfgEnable;
             end
 
-            if (flit_in_valid && flit_in_is_multicast && !repl_active) begin
-                if (group_active[flit_in_group_id]) begin
-                    repl_active <= 1;
-                    repl_data <= flit_in_data;
-                    repl_remaining <= group_mask[flit_in_group_id];
-                    multicast_count <= multicast_count + 1;
+            if (flitInValid && flitInIsMulticast && !replActive) begin
+                if (groupActive[flitInGroupId]) begin
+                    replActive <= 1;
+                    replData <= flitInData;
+                    replRemaining <= groupMask[flitInGroupId];
+                    multicastCount <= multicastCount + 1;
                 end
             end
 
-            if (repl_active) begin
-                if (next_found) begin
-                    flit_out_valid <= 1;
-                    flit_out_data <= repl_data;
-                    flit_out_target_id <= next_target;
-                    repl_current <= next_target;
+            if (replActive) begin
+                if (nextFound) begin
+                    flitOutValid <= 1;
+                    flitOutData <= replData;
+                    flitOutTargetId <= nextTarget;
+                    replCurrent <= nextTarget;
 
-                    if (flit_out_ready) begin
-                        repl_remaining[next_target] <= 0;
+                    if (flitOutReady) begin
+                        replRemaining[nextTarget] <= 0;
                     end
                 end else begin
 
-                    repl_active <= 0;
+                    replActive <= 0;
                 end
             end
         end

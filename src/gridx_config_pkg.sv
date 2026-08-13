@@ -5,7 +5,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-package gridx_config_pkg;
+package gridxConfigPkg;
 
     // 1. 3D GEOMETRY - Core Array Dimensions
     // Scale the cube to change total core count.
@@ -83,7 +83,7 @@ package gridx_config_pkg;
     localparam int CFG_TSV_LATENCY_CYCLES   = 1;     // Hybrid bonding, sub-cycle crossing
     localparam int CFG_TSV_BUNDLES_PER_CORE = 12;    // Dense TSV array per core column
     localparam int CFG_TSV_AGGREGATE_BW     = CFG_TSV_DATA_WIDTH * CFG_TSV_BUNDLES_PER_CORE;
-    // 1024 × 12 = 12,288 bits/cycle → at 4 GHz = 6,144 GB/s ≈ 6 TB/s per core column
+    // 1024 ? 12 = 12,288 bits/cycle ? at 4 GHz = 6,144 GB/s ? 6 TB/s per core column
 
     // 10. MMU / TLB CONFIGURATION
     localparam int CFG_TLB_ENTRIES          = 64;   // TLB entry count
@@ -146,20 +146,20 @@ package gridx_config_pkg;
     localparam logic [21:0] CFG_L3_END  = 22'h3FFFFF;
 
     // Coordinate helpers
-    function automatic int cfg_coord_to_id(int x, int y, int z);
-        cfg_coord_to_id = z * (CFG_CUBE_X * CFG_CUBE_Y) + y * CFG_CUBE_X + x;
+    function automatic int cfgCoordToId(int x, int y, int z);
+        cfgCoordToId = z * (CFG_CUBE_X * CFG_CUBE_Y) + y * CFG_CUBE_X + x;
     endfunction
 
-    function automatic int cfg_id_to_x(int id);
-        cfg_id_to_x = id % CFG_CUBE_X;
+    function automatic int cfgIdToX(int id);
+        cfgIdToX = id % CFG_CUBE_X;
     endfunction
 
-    function automatic int cfg_id_to_y(int id);
-        cfg_id_to_y = (id / CFG_CUBE_X) % CFG_CUBE_Y;
+    function automatic int cfgIdToY(int id);
+        cfgIdToY = (id / CFG_CUBE_X) % CFG_CUBE_Y;
     endfunction
 
-    function automatic int cfg_id_to_z(int id);
-        cfg_id_to_z = id / (CFG_CUBE_X * CFG_CUBE_Y);
+    function automatic int cfgIdToZ(int id);
+        cfgIdToZ = id / (CFG_CUBE_X * CFG_CUBE_Y);
     endfunction
 
 endpackage

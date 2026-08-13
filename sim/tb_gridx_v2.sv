@@ -353,9 +353,7 @@ module tb_gridx_v2;
 
     // Test Sequence
     initial begin
-        $display("=================================================");
-        $display(" GridX³ V2 Closed-Loop Testbench Started");
-        $display("=================================================");
+        $display("[TB_GRIDX_V2] GridX3 V2 Closed-Loop Testbench Started");
         
         reset = 1;
         host_cmd_valid = 0;
@@ -573,9 +571,7 @@ module tb_gridx_v2;
         $display("[%0t] HCP Task Graph Finished successfully.", $time);
         $display("✓ Phase 3 HCP Task Graph PASSED.");
         
-        $display("\n=================================================");
-        $display(" ALL TESTS PASSED SUCCESSFULLY!");
-        $display("=================================================");
+        $display("[TB_GRIDX_V2] RESULT: ALL TESTS PASSED SUCCESSFULLY!");
         #100;
         $finish;
     end

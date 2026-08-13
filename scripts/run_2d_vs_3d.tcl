@@ -15,7 +15,6 @@ set SIM_DIR      [file join $PROJECT_ROOT sim]
 set LOG_3D [file join $WORK_DIR gvf_3d.log]
 set LOG_2D [file join $WORK_DIR gvf_2d.log]
 
-# --- Shared file-list builder (same as compile_xsim.tcl) ---
 proc add_unique {var_name file_name} {
     upvar 1 $var_name files
     set normalized [file normalize $file_name]
@@ -126,7 +125,6 @@ puts "║   Config A: CUBE_X=2, CUBE_Y=2, CUBE_Z=1  (2D, 4 cores)      ║"
 puts "║   Config B: CUBE_X=2, CUBE_Y=2, CUBE_Z=2  (3D, 8 cores)      ║"
 puts "╚══════════════════════════════════════════════════════════════════╝"
 
-# --- Run 3D baseline (gvf.sv) ---
 set ok_3d [compile_and_run "gvf" $SRC_DIR $MESH_SRC_DIR $SIM_DIR $WORK_DIR $LOG_3D \
     "3D-BASELINE (2x2x2, 8 cores)"]
 
@@ -135,7 +133,6 @@ if {!$ok_3d} {
     exit 1
 }
 
-# --- Run 2D slice (gvf_2d.sv) ---
 set ok_2d [compile_and_run "gvf_2d" $SRC_DIR $MESH_SRC_DIR $SIM_DIR $WORK_DIR $LOG_2D \
     "2D-SLICE (2x2x1, 4 cores)"]
 
@@ -144,7 +141,6 @@ if {!$ok_2d} {
     exit 1
 }
 
-# --- Run analysis ---
 puts ""
 puts "╔══════════════════════════════════════════════════════════════════╗"
 puts "║   Running Analysis                                             ║"

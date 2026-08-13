@@ -2,89 +2,89 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module async_fifo #(
+module asyncFifo #(
     parameter DATA_WIDTH = 8,
     parameter DEPTH      = 8,
     parameter PTR_WIDTH  = $clog2(DEPTH)
 ) (
 
-    input  wire                  wr_clk,
-    input  wire                  wr_rst,
-    input  wire                  wr_en,
-    input  wire [DATA_WIDTH-1:0] wr_data,
-    output wire                  wr_full,
+    input  wire                  wrClk,
+    input  wire                  wrRst,
+    input  wire                  wrEn,
+    input  wire [DATA_WIDTH-1:0] wrData,
+    output wire                  wrFull,
 
-    input  wire                  rd_clk,
-    input  wire                  rd_rst,
-    input  wire                  rd_en,
-    output wire [DATA_WIDTH-1:0] rd_data,
-    output wire                  rd_empty
+    input  wire                  rdClk,
+    input  wire                  rdRst,
+    input  wire                  rdEn,
+    output wire [DATA_WIDTH-1:0] rdData,
+    output wire                  rdEmpty
 );
 
     reg [DATA_WIDTH-1:0] mem [DEPTH-1:0];
 
-    reg [PTR_WIDTH:0] wr_ptr_bin, wr_ptr_gray;
-    reg [PTR_WIDTH:0] rd_ptr_bin, rd_ptr_gray;
+    reg [PTR_WIDTH:0] wrPtrBin, wrPtrGray;
+    reg [PTR_WIDTH:0] rdPtrBin, rdPtrGray;
 
-    reg [PTR_WIDTH:0] wr_ptr_gray_rd_sync1, wr_ptr_gray_rd_sync2;
-    reg [PTR_WIDTH:0] rd_ptr_gray_wr_sync1, rd_ptr_gray_wr_sync2;
+    reg [PTR_WIDTH:0] wrPtrGrayRdSync1, wrPtrGrayRdSync2;
+    reg [PTR_WIDTH:0] rdPtrGrayWrSync1, rdPtrGrayWrSync2;
 
     function automatic [PTR_WIDTH:0] bin2gray(input [PTR_WIDTH:0] bin);
         bin2gray = bin ^ (bin >> 1);
     endfunction
 
-    wire [PTR_WIDTH:0] wr_ptr_bin_next = wr_ptr_bin + (wr_en && !wr_full);
-    wire wr_full_internal = (wr_ptr_gray == {~rd_ptr_gray_wr_sync2[PTR_WIDTH:PTR_WIDTH-1],
-                                              rd_ptr_gray_wr_sync2[PTR_WIDTH-2:0]});
-    assign wr_full = wr_full_internal;
+    wire [PTR_WIDTH:0] wrPtrBinNext = wrPtrBin + (wrEn && !wrFull);
+    wire wrFullInternal = (wrPtrGray == {~rdPtrGrayWrSync2[PTR_WIDTH:PTR_WIDTH-1],
+                                              rdPtrGrayWrSync2[PTR_WIDTH-2:0]});
+    assign wrFull = wrFullInternal;
 
-    always @(posedge wr_clk) begin
-        if (wr_rst) begin
-            wr_ptr_bin  <= 0;
-            wr_ptr_gray <= 0;
+    always @(posedge wrClk) begin
+        if (wrRst) begin
+            wrPtrBin  <= 0;
+            wrPtrGray <= 0;
         end else begin
-            if (wr_en && !wr_full_internal) begin
-                mem[wr_ptr_bin[PTR_WIDTH-1:0]] <= wr_data;
-                wr_ptr_bin  <= wr_ptr_bin_next;
-                wr_ptr_gray <= bin2gray(wr_ptr_bin_next);
+            if (wrEn && !wrFullInternal) begin
+                mem[wrPtrBin[PTR_WIDTH-1:0]] <= wrData;
+                wrPtrBin  <= wrPtrBinNext;
+                wrPtrGray <= bin2gray(wrPtrBinNext);
             end
         end
     end
 
-    always @(posedge wr_clk) begin
-        if (wr_rst) begin
-            rd_ptr_gray_wr_sync1 <= 0;
-            rd_ptr_gray_wr_sync2 <= 0;
+    always @(posedge wrClk) begin
+        if (wrRst) begin
+            rdPtrGrayWrSync1 <= 0;
+            rdPtrGrayWrSync2 <= 0;
         end else begin
-            rd_ptr_gray_wr_sync1 <= rd_ptr_gray;
-            rd_ptr_gray_wr_sync2 <= rd_ptr_gray_wr_sync1;
+            rdPtrGrayWrSync1 <= rdPtrGray;
+            rdPtrGrayWrSync2 <= rdPtrGrayWrSync1;
         end
     end
 
-    wire [PTR_WIDTH:0] rd_ptr_bin_next = rd_ptr_bin + (rd_en && !rd_empty);
-    wire rd_empty_internal = (rd_ptr_gray == wr_ptr_gray_rd_sync2);
-    assign rd_empty = rd_empty_internal;
-    assign rd_data = mem[rd_ptr_bin[PTR_WIDTH-1:0]];
+    wire [PTR_WIDTH:0] rdPtrBinNext = rdPtrBin + (rdEn && !rdEmpty);
+    wire rdEmptyInternal = (rdPtrGray == wrPtrGrayRdSync2);
+    assign rdEmpty = rdEmptyInternal;
+    assign rdData = mem[rdPtrBin[PTR_WIDTH-1:0]];
 
-    always @(posedge rd_clk) begin
-        if (rd_rst) begin
-            rd_ptr_bin  <= 0;
-            rd_ptr_gray <= 0;
+    always @(posedge rdClk) begin
+        if (rdRst) begin
+            rdPtrBin  <= 0;
+            rdPtrGray <= 0;
         end else begin
-            if (rd_en && !rd_empty_internal) begin
-                rd_ptr_bin  <= rd_ptr_bin_next;
-                rd_ptr_gray <= bin2gray(rd_ptr_bin_next);
+            if (rdEn && !rdEmptyInternal) begin
+                rdPtrBin  <= rdPtrBinNext;
+                rdPtrGray <= bin2gray(rdPtrBinNext);
             end
         end
     end
 
-    always @(posedge rd_clk) begin
-        if (rd_rst) begin
-            wr_ptr_gray_rd_sync1 <= 0;
-            wr_ptr_gray_rd_sync2 <= 0;
+    always @(posedge rdClk) begin
+        if (rdRst) begin
+            wrPtrGrayRdSync1 <= 0;
+            wrPtrGrayRdSync2 <= 0;
         end else begin
-            wr_ptr_gray_rd_sync1 <= wr_ptr_gray;
-            wr_ptr_gray_rd_sync2 <= wr_ptr_gray_rd_sync1;
+            wrPtrGrayRdSync1 <= wrPtrGray;
+            wrPtrGrayRdSync2 <= wrPtrGrayRdSync1;
         end
     end
 

@@ -46,35 +46,41 @@ module tb_isa_program;
     wire [7:0] dmem_rd_data;
 
     // Instantiation of the top-level GPU kernel top
-    gridx_kernel_top #(
+    gridxKernelTop #(
+        .CUBE_X            (2),
+        .CUBE_Y            (2),
+        .CUBE_Z            (1),
+        .THREADS_PER_BLOCK (4),
+        .WARPS_PER_CORE    (1),
+        .NUM_HBM_NODES     (1),
         .PMEM_DEPTH        (PMEM_DEPTH),
         .DMEM_DEPTH        (DMEM_DEPTH),
         .SIM_TIMEOUT_CYCLES(TIMEOUT)
     ) dut (
-        .clk_sys       (clk),
-        .rst_n         (rst_n),
-        .host_wr_en    (host_wr_en),
-        .host_wr_data  (host_wr_data),
-        .host_start    (host_start),
-        .kernel_done   (kernel_done),
-        .kernel_fault  (kernel_fault),
-        .kernel_state_o(kernel_state),
-        .perf_hbm_reads   (perf_hbm_reads),
-        .perf_hbm_writes  (perf_hbm_writes),
-        .perf_total_flits (perf_total_flits),
-        .perf_cycle_count (perf_cycle_count),
-        .perf_active_cores(perf_active_cores),
-        .dbg_core_done_sample(dbg_core_done_sample),
-        .dbg_mesh_busy (dbg_mesh_busy),
-        .pmem_wr_en    (pmem_wr_en),
-        .pmem_wr_addr  (pmem_wr_addr),
-        .pmem_wr_data  (pmem_wr_data),
-        .dmem_wr_en    (dmem_wr_en),
-        .dmem_wr_addr  (dmem_wr_addr),
-        .dmem_wr_data  (dmem_wr_data),
-        .dmem_rd_en    (dmem_rd_en),
-        .dmem_rd_addr  (dmem_rd_addr),
-        .dmem_rd_data  (dmem_rd_data)
+        .clkSys       (clk),
+        .rstN         (rst_n),
+        .hostWrEn    (host_wr_en),
+        .hostWrData  (host_wr_data),
+        .hostStart    (host_start),
+        .kernelDone   (kernel_done),
+        .kernelFault  (kernel_fault),
+        .kernelStateO(kernel_state),
+        .perfHbmReads   (perf_hbm_reads),
+        .perfHbmWrites  (perf_hbm_writes),
+        .perfTotalFlits (perf_total_flits),
+        .perfCycleCount (perf_cycle_count),
+        .perfActiveCores(perf_active_cores),
+        .dbgCoreDoneSample(dbg_core_done_sample),
+        .dbgMeshBusy (dbg_mesh_busy),
+        .pmemWrEn    (pmem_wr_en),
+        .pmemWrAddr  (pmem_wr_addr),
+        .pmemWrData  (pmem_wr_data),
+        .dmemWrEn    (dmem_wr_en),
+        .dmemWrAddr  (dmem_wr_addr),
+        .dmemWrData  (dmem_wr_data),
+        .dmemRdEn    (dmem_rd_en),
+        .dmemRdAddr  (dmem_rd_addr),
+        .dmemRdData  (dmem_rd_data)
     );
 
     // Helpers
@@ -203,9 +209,7 @@ module tb_isa_program;
     integer file_handle;
 
     initial begin
-        $display("[TB] ===================================================");
-        $display("[TB]  GridX3 ISA Program Testbench (Closed-Loop Run)");
-        $display("[TB] ===================================================");
+        $display("[TB] GridX3 ISA Program Testbench (Closed-Loop Run)");
 
         // Reset
         do_reset();
@@ -280,9 +284,7 @@ module tb_isa_program;
         $fdisplay(file_handle, "%0d", Reduction_Sum);
         $fclose(file_handle);
 
-        $display("[TB] ===================================================");
-        $display("[TB]  Simulation Complete. Ready for golden comparison.");
-        $display("[TB] ===================================================");
+        $display("[TB] Simulation Complete. Ready for golden comparison.");
         $finish;
     end
 

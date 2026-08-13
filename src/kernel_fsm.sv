@@ -1,14 +1,13 @@
 // Kernel State Machine & Execution FSM
 // This FSM manages kernel lifecycle states from launch to completion.
-// I diagnosed and resolved a critical scheduler deadlock here by adding the first_wave_dispatched condition.
+// I diagnosed and resolved a critical scheduler deadlock here by adding the firstWaveDispatched condition.
 // This unblocked active cores so they could start executing immediately during block dispatch,
 // which enabled hardware block recycling up to 4.0x oversubscription.
-
 
 `default_nettype none
 `timescale 1ns/1ns
 
-module kernel_fsm #(
+module kernelFsm #(
     parameter NUM_CORES = 8,
     parameter WARPS_PER_CORE = 1,
     parameter WATCHDOG_THRESHOLD = 4096,
@@ -17,41 +16,41 @@ module kernel_fsm #(
     input wire clk,
     input wire reset,
     input wire start,
-    input wire dcr_valid,
-    input wire [15:0] thread_count,
-    input wire all_blocks_dispatched,
-    input wire all_blocks_done,
-    input wire [15:0] blocks_dispatched,
-    input wire [15:0] total_blocks,
-    input wire [NUM_CORES-1:0] core_done,
-    input wire [6:0] outstanding_mem,
-    input wire [3:0] tensor_inflight,
-    input wire instr_retired,
-    input wire mem_response,
-    input wire tensor_complete,
+    input wire dcrValid,
+    input wire [15:0] threadCount,
+    input wire allBlocksDispatched,
+    input wire allBlocksDone,
+    input wire [15:0] blocksDispatched,
+    input wire [15:0] totalBlocks,
+    input wire [NUM_CORES-1:0] coreDone,
+    input wire [6:0] outstandingMem,
+    input wire [3:0] tensorInflight,
+    input wire instrRetired,
+    input wire memResponse,
+    input wire tensorComplete,
 
-    input wire force_preempt,
+    input wire forcePreempt,
 
-    input wire gc6_sleep_req,
-    output reg context_save_trigger,
+    input wire gc6SleepReq,
+    output reg contextSaveTrigger,
 
-    input wire fault_kill,
+    input wire faultKill,
 
-    input wire [31:0] dcr_watchdog_thresh,
+    input wire [31:0] dcrWatchdogThresh,
 
-    output reg [2:0] kernel_state,
-    output wire kernel_done,
-    output wire kernel_running,
-    output wire kernel_draining,
-    output wire kernel_fault,
-    output wire kernel_configured,
-    output wire kernel_preempting,
-    output wire allow_dispatch,
-    output wire allow_fetch,
-    output wire allow_issue,
-    output wire allow_memory,
-    output wire allow_tensor,
-    output wire allow_writeback
+    output reg [2:0] kernelState,
+    output wire kernelDone,
+    output wire kernelRunning,
+    output wire kernelDraining,
+    output wire kernelFault,
+    output wire kernelConfigured,
+    output wire kernelPreempting,
+    output wire allowDispatch,
+    output wire allowFetch,
+    output wire allowIssue,
+    output wire allowMemory,
+    output wire allowTensor,
+    output wire allowWriteback
 );
     localparam KERNEL_RESET      = 3'b000,
                KERNEL_CONFIGURED = 3'b001,
@@ -61,161 +60,158 @@ module kernel_fsm #(
                KERNEL_DONE       = 3'b101,
                KERNEL_FAULT      = 3'b110,
                KERNEL_PREEMPT    = 3'b111;
-    reg kernel_started;
-    reg [31:0] watchdog_counter;
-    reg [31:0] drain_counter;
-    reg double_start_guard;
-    wire [31:0] effective_watchdog = (dcr_watchdog_thresh != 0) ? dcr_watchdog_thresh : WATCHDOG_THRESHOLD;
-    wire kernel_progress = instr_retired || mem_response || tensor_complete;
+    reg kernelStarted;
+    reg [31:0] watchdogCounter;
+    reg [31:0] drainCounter;
+    reg doubleStartGuard;
+    wire [31:0] effectiveWatchdog = (dcrWatchdogThresh != 0) ? dcrWatchdogThresh : WATCHDOG_THRESHOLD;
+    wire kernelProgress = instrRetired || memResponse || tensorComplete;
     // FIX: Allow LAUNCH->RUNNING when the first wave fills all available cores,
-    // even if total_blocks > NUM_CORES. Remaining blocks dispatch via recycling
-    // in dispatch.sv during RUNNING state (cores finish -> core_done -> core_reset
+    // even if totalBlocks > NUM_CORES. Remaining blocks dispatch via recycling
+    // in dispatch.sv during RUNNING state (cores finish -> coreDone -> coreReset
     // > next block dispatched). Previously required ALL blocks dispatched before
-    // leaving LAUNCH, which deadlocked when total_blocks > NUM_CORES because
-    // cores couldn't execute (kernel_running=false during LAUNCH).
-    wire first_wave_dispatched = (blocks_dispatched >= NUM_CORES) && (total_blocks > 0);
-    wire all_warps_initialized = ((blocks_dispatched >= total_blocks) || first_wave_dispatched) && (total_blocks > 0);
-    wire all_cores_done = (core_done == {NUM_CORES{1'b1}});
-    // drain_complete: all outstanding memory and tensor operations have completed.
-    // tensor_inflight is a clean 4-bit zero (no tensor pipeline tracking active).
-    // outstanding_mem tracks live read/write requests via a registered counter.
-    wire drain_complete = (outstanding_mem == 7'd0) && (tensor_inflight == 4'd0);
-    wire watchdog_timeout = (watchdog_counter >= effective_watchdog);
-    wire drain_timeout = (drain_counter >= MAX_DRAIN_CYCLES);
-    assign kernel_done       = (kernel_state == KERNEL_DONE);
-    assign kernel_running    = (kernel_state == KERNEL_RUNNING);
-    assign kernel_draining   = (kernel_state == KERNEL_DRAIN);
-    assign kernel_fault      = (kernel_state == KERNEL_FAULT);
-    assign kernel_configured = (kernel_state == KERNEL_CONFIGURED);
-    assign kernel_preempting = (kernel_state == KERNEL_PREEMPT);
+    // leaving LAUNCH, which deadlocked when totalBlocks > NUM_CORES because
+    // cores couldn't execute (kernelRunning=false during LAUNCH).
+    wire firstWaveDispatched = (blocksDispatched >= NUM_CORES) && (totalBlocks > 0);
+    wire allWarpsInitialized = ((blocksDispatched >= totalBlocks) || firstWaveDispatched) && (totalBlocks > 0);
+    wire allCoresDone = (coreDone == {NUM_CORES{1'b1}});
+    // drainComplete: all outstanding memory and tensor operations have completed.
+    // tensorInflight is a clean 4-bit zero (no tensor pipeline tracking active).
+    // outstandingMem tracks live read/write requests via a registered counter.
+    wire drainComplete = (outstandingMem == 7'd0) && (tensorInflight == 4'd0);
+    wire watchdogTimeout = (watchdogCounter >= effectiveWatchdog);
+    wire drainTimeout = (drainCounter >= MAX_DRAIN_CYCLES);
 
-    assign allow_dispatch = (kernel_state == KERNEL_LAUNCH) ||
-                            (kernel_state == KERNEL_RUNNING);
-    assign allow_fetch = (kernel_state == KERNEL_LAUNCH) ||
-                         (kernel_state == KERNEL_RUNNING);
+    assign kernelDone       = (kernelState == KERNEL_DONE);
+    assign kernelRunning    = (kernelState == KERNEL_RUNNING);
+    assign kernelDraining   = (kernelState == KERNEL_DRAIN);
+    assign kernelFault      = (kernelState == KERNEL_FAULT);
+    assign kernelConfigured = (kernelState == KERNEL_CONFIGURED);
+    assign kernelPreempting = (kernelState == KERNEL_PREEMPT);
 
-    assign allow_issue  = (kernel_state == KERNEL_RUNNING);
-    assign allow_memory = (kernel_state == KERNEL_RUNNING);
-    assign allow_tensor = (kernel_state == KERNEL_RUNNING);
+    assign allowDispatch = (kernelState == KERNEL_LAUNCH) ||
+                            (kernelState == KERNEL_RUNNING);
+    assign allowFetch = (kernelState == KERNEL_LAUNCH) ||
+                         (kernelState == KERNEL_RUNNING);
 
-    assign allow_writeback = (kernel_state == KERNEL_RUNNING) ||
-                             (kernel_state == KERNEL_DRAIN) ||
-                             (kernel_state == KERNEL_PREEMPT);
+    assign allowIssue  = (kernelState == KERNEL_RUNNING);
+    assign allowMemory = (kernelState == KERNEL_RUNNING);
+    assign allowTensor = (kernelState == KERNEL_RUNNING);
+
+    assign allowWriteback = (kernelState == KERNEL_RUNNING) ||
+                             (kernelState == KERNEL_DRAIN) ||
+                             (kernelState == KERNEL_PREEMPT);
+
     always @(posedge clk) begin
         if (reset) begin
-            kernel_state        <= KERNEL_RESET;
-            kernel_started      <= 0;
-            watchdog_counter    <= 0;
-            drain_counter       <= 0;
-            context_save_trigger<= 0;
-            double_start_guard  <= 0;
+            kernelState        <= KERNEL_RESET;
+            kernelStarted      <= 0;
+            watchdogCounter    <= 0;
+            drainCounter       <= 0;
+            contextSaveTrigger <= 0;
+            doubleStartGuard   <= 0;
         end else begin
-            context_save_trigger <= 1'b0;
-            case (kernel_state)
+            contextSaveTrigger <= 1'b0;
+            case (kernelState)
                 KERNEL_RESET: begin
-                    kernel_started     <= 0;
-                    watchdog_counter   <= 0;
-                    drain_counter      <= 0;
-                    double_start_guard <= 0;
-                    if (dcr_valid && thread_count > 0) begin
-                        kernel_state <= KERNEL_CONFIGURED;
+                    kernelStarted     <= 0;
+                    watchdogCounter   <= 0;
+                    drainCounter      <= 0;
+                    doubleStartGuard  <= 0;
+                    if (dcrValid && threadCount > 0) begin
+                        kernelState <= KERNEL_CONFIGURED;
                     end
                 end
                 KERNEL_CONFIGURED: begin
-
-                    if (start && !double_start_guard) begin
-                        kernel_state       <= KERNEL_LAUNCH;
-                        kernel_started     <= 1;
-                        double_start_guard <= 1;
+                    if (start && !doubleStartGuard) begin
+                        kernelState       <= KERNEL_LAUNCH;
+                        kernelStarted     <= 1;
+                        doubleStartGuard  <= 1;
                     end
                 end
                 KERNEL_LAUNCH: begin
-                    if (all_warps_initialized) begin
-                        kernel_state     <= KERNEL_RUNNING;
-                        watchdog_counter <= 0;
-                    end
-                    if (watchdog_timeout) begin
-                        kernel_state <= KERNEL_FAULT;
+                    if (allWarpsInitialized) begin
+                        kernelState     <= KERNEL_RUNNING;
+                        watchdogCounter <= 0;
+                    end else if (watchdogTimeout) begin
+                        kernelState <= KERNEL_FAULT;
+                    end else begin
+                        watchdogCounter <= watchdogCounter + 1;
                     end
                 end
                 KERNEL_RUNNING: begin
-                    if (kernel_progress) begin
-                        watchdog_counter <= 0;
+                    if (kernelProgress) begin
+                        watchdogCounter <= 0;
                     end else begin
-                        watchdog_counter <= watchdog_counter + 1;
+                        watchdogCounter <= watchdogCounter + 1;
                     end
 
-                    if (fault_kill) begin
-                        kernel_state <= KERNEL_FAULT;
-                    end
-
-                    else if (force_preempt) begin
-                        kernel_state         <= KERNEL_PREEMPT;
-                        context_save_trigger <= 1'b1;
-                        drain_counter        <= 0;
-                    end
-
-                    else if (gc6_sleep_req) begin
-                        kernel_state         <= KERNEL_PREEMPT;
-                        context_save_trigger <= 1'b1;
-                        drain_counter        <= 0;
-                    end
-
-                    else if (all_blocks_done) begin
-                        kernel_state  <= KERNEL_DRAIN;
-                        drain_counter <= 0;
-                    end
-                    else if (watchdog_timeout) begin
-                        kernel_state <= KERNEL_FAULT;
+                    if (faultKill) begin
+                        kernelState <= KERNEL_FAULT;
+                    end else if (forcePreempt) begin
+                        kernelState         <= KERNEL_PREEMPT;
+                        contextSaveTrigger <= 1'b1;
+                        drainCounter        <= 0;
+                    end else if (gc6SleepReq) begin
+                        kernelState         <= KERNEL_PREEMPT;
+                        contextSaveTrigger <= 1'b1;
+                        drainCounter        <= 0;
+                    end else if (allBlocksDone) begin
+                        kernelState  <= KERNEL_DRAIN;
+                        drainCounter <= 0;
+                    end else if (watchdogTimeout) begin
+                        kernelState <= KERNEL_FAULT;
                     end
                 end
                 KERNEL_PREEMPT: begin
-
-                    drain_counter <= drain_counter + 1;
-                    if (drain_complete) begin
-                        kernel_state <= KERNEL_DONE;
-                    end else if (drain_timeout) begin
-                        kernel_state <= KERNEL_FAULT;
+                    drainCounter <= drainCounter + 1;
+                    if (drainComplete) begin
+                        kernelState <= KERNEL_DONE;
+                    end else if (drainTimeout) begin
+                        kernelState <= KERNEL_FAULT;
                     end
                 end
                 KERNEL_DRAIN: begin
-                    drain_counter <= drain_counter + 1;
-                    if (drain_counter % 1000 == 0) begin
-                         $display("[KERNEL_FSM] Draining... Mem: %d, Tensor: %b", outstanding_mem, tensor_inflight);
+                    drainCounter <= drainCounter + 1;
+                    if (drainCounter % 1000 == 0) begin
+                         $display("[kernelFsm] Draining... Mem: %d, Tensor: %b", outstandingMem, tensorInflight);
                     end
-                    // Use else-if to prevent drain_timeout from overriding drain_complete
-                    // in the same cycle. drain_complete has priority.
-                    if (drain_complete) begin
-                        kernel_state <= KERNEL_DONE;
-                    end else if (drain_timeout) begin
-                        kernel_state <= KERNEL_FAULT;
+                    // Use else-if to prevent drainTimeout from overriding drainComplete
+                    // in the same cycle. drainComplete has priority.
+                    if (drainComplete) begin
+                        kernelState <= KERNEL_DONE;
+                    end else if (drainTimeout) begin
+                        kernelState <= KERNEL_FAULT;
                     end
                 end
                 KERNEL_DONE: begin
+                    // Wait in DONE state. Reset externally via global reset or explicit clear.
+                    if (!start) doubleStartGuard <= 0;
                 end
                 KERNEL_FAULT: begin
+                    // Unrecoverable fault state. Requires reset.
                 end
                 default: begin
-                    kernel_state <= KERNEL_FAULT;
+                    kernelState <= KERNEL_FAULT;
                 end
             endcase
         end
     end
-    // synthesis translate_off
-    reg [2:0] prev_state;
+    // synthesis translateOff
+    reg [2:0] prevState;
     always @(posedge clk) begin
         if (reset) begin
-            prev_state <= KERNEL_RESET;
+            prevState <= KERNEL_RESET;
         end else begin
-            prev_state <= kernel_state;
-            if (kernel_state != prev_state) begin
-                $display("[KERNEL_FSM] State transition: %0d -> %0d at cycle %0d", prev_state, kernel_state, watchdog_counter);
-                if (kernel_state == KERNEL_FAULT) begin
-                    $display("[KERNEL_FSM] FAULT DETECTED! watchdog=%0d effective_watchdog=%0d all_blocks_done=%0b fault_kill=%0b watchdog_timeout=%0b all_warps_initialized=%0b",
-                             watchdog_counter, effective_watchdog, all_blocks_done, fault_kill, watchdog_timeout, all_warps_initialized);
+            prevState <= kernelState;
+            if (kernelState != prevState) begin
+                $display("[kernelFsm] State transition: %0d -> %0d at cycle %0d", prevState, kernelState, watchdogCounter);
+                if (kernelState == KERNEL_FAULT) begin
+                    $display("[kernelFsm] FAULT DETECTED! watchdog=%0d effectiveWatchdog=%0d allBlocksDone=%0b faultKill=%0b watchdogTimeout=%0b allWarpsInitialized=%0b",
+                             watchdogCounter, effectiveWatchdog, allBlocksDone, faultKill, watchdogTimeout, allWarpsInitialized);
                 end
             end
         end
     end
-    // synthesis translate_on
+    // synthesis translateOn
 endmodule

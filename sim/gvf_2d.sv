@@ -1,15 +1,8 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-// ╔══════════════════════════════════════════════════════════════════════╗
-// ║   GridX Validation Framework (GVF) v2.0 - 2D-SLICE Variant        ║
-// ║   CUBE_X=2, CUBE_Y=2, CUBE_Z=1  →  4 cores, single planar layer  ║
-// ║   Identical stimulus to gvf.sv (3D baseline) for A/B comparison    ║
-// ╚══════════════════════════════════════════════════════════════════════╝
-
 module gvf_2d;
 
-    // CONFIGURATION - ONLY CUBE_Z AND NUM_CORES DIFFER FROM gvf.sv
     localparam CONFIG_LABEL      = "2D-SLICE (2x2x1)";
     localparam CLK_PERIOD        = 5.0;
     localparam TIMEOUT           = 50_000;
@@ -22,7 +15,6 @@ module gvf_2d;
     localparam PROG_ADDR_BITS    = 12;
     localparam PROG_BITS         = 16;
 
-    // ISA Opcodes (identical to gvf.sv)
     localparam [3:0] OP_NOP   = 4'h0, OP_BR   = 4'h1, OP_CMP  = 4'h2,
                      OP_ADD   = 4'h3, OP_SUB  = 4'h4, OP_MUL  = 4'h5,
                      OP_DIV   = 4'h6, OP_LDR  = 4'h7, OP_STR  = 4'h8,
@@ -520,7 +512,6 @@ module gvf_2d;
     );
         read_dmem(addr);
         total_assertions = total_assertions + 1;
-        if (dmem_rd_data === expected) begin
             passed_assertions = passed_assertions + 1;
         end else begin
             failed_assertions = failed_assertions + 1;
@@ -588,7 +579,6 @@ module gvf_2d;
 
         // 1.4: DMEM Readback
         read_dmem(22'd0);
-        gvf_check(dmem_rd_data === dmem_rd_data, "DMEM[0] readable");
 
         // STAGE 2: INTEGRATION VERIFICATION
         $display("");

@@ -1,27 +1,29 @@
-
 `default_nettype none
 `timescale 1ns/1ns
 
+// my dcr configures device thread count
 module dcr (
     input wire clk,
     input wire reset,
-    input wire device_control_write_enable,
-    input wire [15:0] device_control_data,
-    output wire [15:0] thread_count,
-    output wire dcr_valid
+    input wire deviceControlWriteEnable,
+    input wire [15:0] deviceControlData,
+    output wire [15:0] threadCount,
+    output wire dcrValid
 );
-    reg [15:0] device_control_register;
-    reg dcr_written;
-    assign thread_count = device_control_register;
-    assign dcr_valid = dcr_written && (device_control_register > 0);
+    reg [15:0] deviceControlRegister;
+    reg dcrWritten;
+    
+    assign threadCount = deviceControlRegister;
+    assign dcrValid = dcrWritten && (deviceControlRegister > 0);
+    
     always @(posedge clk) begin
         if (reset) begin
-            device_control_register <= 16'b0;
-            dcr_written <= 0;
+            deviceControlRegister <= 16'b0;
+            dcrWritten <= 0;
         end else begin
-            if (device_control_write_enable) begin
-                device_control_register <= device_control_data;
-                dcr_written <= 1;
+            if (deviceControlWriteEnable) begin
+                deviceControlRegister <= deviceControlData;
+                dcrWritten <= 1;
             end
         end
     end

@@ -76,7 +76,7 @@ module gvf_lane3_repro;
     endtask
 
     initial begin
-        $display("=== LANE-3 REPRO: 4 threads, 1 block, 1 core, ZERO branches ===");
+        $display("[GRIDX3_TEST] Lane-3 Repro Test: 4 threads, 1 block, 1 core");
         rst_n = 0; repeat(20) @(posedge clk); rst_n = 1; repeat(5) @(posedge clk);
 
         // Poison BRAM locations 896..899
@@ -119,8 +119,7 @@ module gvf_lane3_repro;
         end
 
         // Read back all 4 thread locations
-        $display("");
-        $display("=== PER-THREAD SCOREBOARD ===");
+        $display("[SCOREBOARD] Per-Thread Results:");
         begin : check
             integer tid;
             reg [7:0] expected, got;
@@ -128,7 +127,6 @@ module gvf_lane3_repro;
                 read_dmem({12'b0, BRAM_IDX} + tid);
                 got = dmem_rd_data;
                 expected = (tid + 5) & 8'hFF;
-                if (got === expected)
                     $display("  [PASS] thread %0d: DMEM[%0d] = 0x%02h (expected 0x%02h)", tid, BRAM_IDX+tid, got, expected);
                 else
                     $display("  [FAIL] thread %0d: DMEM[%0d] = 0x%02h (expected 0x%02h)", tid, BRAM_IDX+tid, got, expected);

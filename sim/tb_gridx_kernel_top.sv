@@ -38,35 +38,37 @@ module tb_gridx_kernel_top;
     wire [7:0] dmem_rd_data;
 
     // DUT
-    gridx_kernel_top #(
+    gridxKernelTop #(
         .PMEM_DEPTH        (PMEM_DEPTH),
         .DMEM_DEPTH        (DMEM_DEPTH),
-        .SIM_TIMEOUT_CYCLES(TIMEOUT)
+        .SIM_TIMEOUT_CYCLES(TIMEOUT),
+        .NUM_HBM_NODES     (2)
     ) dut (
-        .clk_sys       (clk),
-        .rst_n         (rst_n),
-        .host_wr_en    (host_wr_en),
-        .host_wr_data  (host_wr_data),
-        .host_start    (host_start),
-        .kernel_done   (kernel_done),
-        .kernel_fault  (kernel_fault),
-        .kernel_state_o(kernel_state),
-        .perf_hbm_reads   (perf_hbm_reads),
-        .perf_hbm_writes  (perf_hbm_writes),
-        .perf_total_flits (perf_total_flits),
-        .perf_cycle_count (perf_cycle_count),
-        .perf_active_cores(perf_active_cores),
-        .dbg_core_done_sample(dbg_core_done_sample),
-        .dbg_mesh_busy (dbg_mesh_busy),
-        .pmem_wr_en    (pmem_wr_en),
-        .pmem_wr_addr  (pmem_wr_addr),
-        .pmem_wr_data  (pmem_wr_data),
-        .dmem_wr_en    (dmem_wr_en),
-        .dmem_wr_addr  (dmem_wr_addr),
-        .dmem_wr_data  (dmem_wr_data),
-        .dmem_rd_en    (dmem_rd_en),
-        .dmem_rd_addr  (dmem_rd_addr),
-        .dmem_rd_data  (dmem_rd_data)
+        .clkSys       (clk),
+        .clkLayer     ({2{clk}}),
+        .rstN         (rst_n),
+        .hostWrEn    (host_wr_en),
+        .hostWrData  (host_wr_data),
+        .hostStart    (host_start),
+        .kernelDone   (kernel_done),
+        .kernelFault  (kernel_fault),
+        .kernelStateO(kernel_state),
+        .perfHbmReads   (perf_hbm_reads),
+        .perfHbmWrites  (perf_hbm_writes),
+        .perfTotalFlits (perf_total_flits),
+        .perfCycleCount (perf_cycle_count),
+        .perfActiveCores(perf_active_cores),
+        .dbgCoreDoneSample(dbg_core_done_sample),
+        .dbgMeshBusy (dbg_mesh_busy),
+        .pmemWrEn    (pmem_wr_en),
+        .pmemWrAddr  (pmem_wr_addr),
+        .pmemWrData  (pmem_wr_data),
+        .dmemWrEn    (dmem_wr_en),
+        .dmemWrAddr  (dmem_wr_addr),
+        .dmemWrData  (dmem_wr_data),
+        .dmemRdEn    (dmem_rd_en),
+        .dmemRdAddr  (dmem_rd_addr),
+        .dmemRdData  (dmem_rd_data)
     );
 
     // State name decoder (for waveform debug)
@@ -126,12 +128,9 @@ module tb_gridx_kernel_top;
     integer test_pass = 1;
 
     initial begin
-        $display("============================================");
-        $display(" GridX³ — 3D GPU Integration Test");
-        $display(" Architecture: 2×2×2 = 8 cores (parameterized)");
-        $display(" Threads/Block: %0d | Warps/Core: %0d",
+        $display("[TB_KERNEL_TOP] GridX3 3D GPU Integration Test");
+        $display("[TB_KERNEL_TOP] Architecture: 2x2x2 = 8 cores | Threads/Block: %0d | Warps/Core: %0d",
                  dut.THREADS_PER_BLOCK, dut.WARPS_PER_CORE);
-        $display("============================================");
 
         // Init all inputs
         rst_n = 0; host_wr_en = 0; host_start = 0; host_wr_data = 0;
@@ -180,23 +179,16 @@ module tb_gridx_kernel_top;
         end
 
         // Report Results
-        $display("");
-        $display("============================================");
         if (kernel_done) begin
-            $display(" ✓ KERNEL COMPLETE — PASS");
-            $display("   Cycles:      %0d", perf_cycle_count);
-            $display("   HBM Reads:   %0d", perf_hbm_reads);
-            $display("   HBM Writes:  %0d", perf_hbm_writes);
-            $display("   Total Flits: %0d", perf_total_flits);
+            $display("[TB_KERNEL_TOP] RESULT: KERNEL COMPLETE - PASS | Cycles: %0d | HBM Reads: %0d | HBM Writes: %0d | Flits: %0d",
+                     perf_cycle_count, perf_hbm_reads, perf_hbm_writes, perf_total_flits);
         end else if (kernel_fault) begin
-            $display(" ✗ KERNEL FAULT at cycle %0d", perf_cycle_count);
-            $display("   State: %0d (%0s)", kernel_state, state_name);
+            $display("[TB_KERNEL_TOP] RESULT: KERNEL FAULT at cycle %0d (State: %0d %0s)", perf_cycle_count, kernel_state, state_name);
             test_pass = 0;
         end else begin
-            $display(" ✗ TIMEOUT after %0d cycles", TIMEOUT);
+            $display("[TB_KERNEL_TOP] RESULT: TIMEOUT after %0d cycles", TIMEOUT);
             test_pass = 0;
         end
-        $display("============================================");
 
         // Readback Test
         $display("[TB] Reading data memory...");

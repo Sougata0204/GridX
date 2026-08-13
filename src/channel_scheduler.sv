@@ -1,9 +1,9 @@
 
 `default_nettype none
 `timescale 1ns/1ns
-import gridx_pkg::*;
+import gridxPkg::*;
 
-module channel_scheduler #(
+module channelScheduler #(
     parameter NUM_CHANNELS        = CH_COUNT,
     parameter DEFAULT_TIMESLICE_P0 = 256,
     parameter DEFAULT_TIMESLICE_P1 = 512,
@@ -12,64 +12,64 @@ module channel_scheduler #(
     parameter DEFAULT_AGING_THRESH = 4096
 ) (
     input  wire                          clk,
-    input  wire                          rst_n,
+    input  wire                          rstN,
 
-    input  wire [NUM_CHANNELS-1:0]       ch_runnable_i,
+    input  wire [NUM_CHANNELS-1:0]       chRunnableI,
 
-    input  wire [NUM_CHANNELS*2-1:0]     ch_priority_i,
+    input  wire [NUM_CHANNELS*2-1:0]     chPriorityI,
 
-    input  wire [NUM_CHANNELS-1:0]       ch_block_done_i,
+    input  wire [NUM_CHANNELS-1:0]       chBlockDoneI,
 
-    input  wire [31:0]                   dcr_timeslice_p0_i,
-    input  wire [31:0]                   dcr_timeslice_p1_i,
-    input  wire [31:0]                   dcr_timeslice_p2_i,
-    input  wire [31:0]                   dcr_timeslice_p3_i,
-    input  wire [31:0]                   dcr_aging_thresh_i,
+    input  wire [31:0]                   dcrTimesliceP0I,
+    input  wire [31:0]                   dcrTimesliceP1I,
+    input  wire [31:0]                   dcrTimesliceP2I,
+    input  wire [31:0]                   dcrTimesliceP3I,
+    input  wire [31:0]                   dcrAgingThreshI,
 
-    output reg  [NUM_CHANNELS-1:0]       ch_running_o,
-    output reg  [NUM_CHANNELS*2-1:0]     ch_state_o,
-    output reg  [NUM_CHANNELS-1:0]       ch_preempt_o,
-    output reg  [NUM_CHANNELS-1:0]       ch_aged_promotion_o,
-    output reg                           all_channels_idle_o,
-    output reg  [$clog2(NUM_CHANNELS)-1:0] active_channel_o
+    output reg  [NUM_CHANNELS-1:0]       chRunningO,
+    output reg  [NUM_CHANNELS*2-1:0]     chStateO,
+    output reg  [NUM_CHANNELS-1:0]       chPreemptO,
+    output reg  [NUM_CHANNELS-1:0]       chAgedPromotionO,
+    output reg                           allChannelsIdleO,
+    output reg  [$clog2(NUM_CHANNELS)-1:0] activeChannelO
 );
     localparam CH_BITS = $clog2(NUM_CHANNELS);
 
-    reg [1:0]  ch_state_reg    [NUM_CHANNELS-1:0];
-    reg [31:0] timeslice_ctr   [NUM_CHANNELS-1:0];
-    reg [31:0] aging_ctr       [NUM_CHANNELS-1:0];
-    reg [1:0]  effective_pri   [NUM_CHANNELS-1:0];
-    reg [CH_BITS-1:0] current_ch;
+    reg [1:0]  chStateReg    [NUM_CHANNELS-1:0];
+    reg [31:0] timesliceCtr   [NUM_CHANNELS-1:0];
+    reg [31:0] agingCtr       [NUM_CHANNELS-1:0];
+    reg [1:0]  effectivePri   [NUM_CHANNELS-1:0];
+    reg [CH_BITS-1:0] currentCh;
 
-    function automatic [31:0] get_timeslice(input [1:0] pri);
+    function automatic [31:0] getTimeslice(input [1:0] pri);
         case (pri)
-            2'h0: get_timeslice = (dcr_timeslice_p0_i != 0) ? dcr_timeslice_p0_i : DEFAULT_TIMESLICE_P0;
-            2'h1: get_timeslice = (dcr_timeslice_p1_i != 0) ? dcr_timeslice_p1_i : DEFAULT_TIMESLICE_P1;
-            2'h2: get_timeslice = (dcr_timeslice_p2_i != 0) ? dcr_timeslice_p2_i : DEFAULT_TIMESLICE_P2;
-            2'h3: get_timeslice = (dcr_timeslice_p3_i != 0) ? dcr_timeslice_p3_i : DEFAULT_TIMESLICE_P3;
-            default: get_timeslice = DEFAULT_TIMESLICE_P2;
+            2'h0: getTimeslice = (dcrTimesliceP0I != 0) ? dcrTimesliceP0I : DEFAULT_TIMESLICE_P0;
+            2'h1: getTimeslice = (dcrTimesliceP1I != 0) ? dcrTimesliceP1I : DEFAULT_TIMESLICE_P1;
+            2'h2: getTimeslice = (dcrTimesliceP2I != 0) ? dcrTimesliceP2I : DEFAULT_TIMESLICE_P2;
+            2'h3: getTimeslice = (dcrTimesliceP3I != 0) ? dcrTimesliceP3I : DEFAULT_TIMESLICE_P3;
+            default: getTimeslice = DEFAULT_TIMESLICE_P2;
         endcase
     endfunction
 
-    function automatic [1:0] ch_pri(input [CH_BITS-1:0] c);
-        ch_pri = ch_priority_i[c*2 +: 2];
+    function automatic [1:0] chPri(input [CH_BITS-1:0] c);
+        chPri = chPriorityI[c*2 +: 2];
     endfunction
 
-    reg [CH_BITS-1:0] best_ch;
-    reg [1:0]         best_pri;
-    reg               best_valid;
+    reg [CH_BITS-1:0] bestCh;
+    reg [1:0]         bestPri;
+    reg               bestValid;
     integer s;
     always @(*) begin
-        best_valid = 1'b0;
-        best_ch    = 0;
-        best_pri   = 2'h3;
+        bestValid = 1'b0;
+        bestCh    = 0;
+        bestPri   = 2'h3;
         for (s = 0; s < NUM_CHANNELS; s = s + 1) begin
-            if (ch_runnable_i[s] && ch_state_reg[s] != CH_PREEMPTED) begin
-                if (!best_valid || effective_pri[s] < best_pri ||
-                    (effective_pri[s] == best_pri && s[CH_BITS-1:0] == current_ch)) begin
-                    best_valid = 1'b1;
-                    best_ch    = s[CH_BITS-1:0];
-                    best_pri   = effective_pri[s];
+            if (chRunnableI[s] && chStateReg[s] != CH_PREEMPTED) begin
+                if (!bestValid || effectivePri[s] < bestPri ||
+                    (effectivePri[s] == bestPri && s[CH_BITS-1:0] == currentCh)) begin
+                    bestValid = 1'b1;
+                    bestCh    = s[CH_BITS-1:0];
+                    bestPri   = effectivePri[s];
                 end
             end
         end
@@ -78,109 +78,109 @@ module channel_scheduler #(
     integer p;
     always @(*) begin
         for (p = 0; p < NUM_CHANNELS; p = p + 1)
-            ch_state_o[p*2 +: 2] = ch_state_reg[p];
+            chStateO[p*2 +: 2] = chStateReg[p];
     end
 
     always @(*) begin
-        all_channels_idle_o = 1'b1;
+        allChannelsIdleO = 1'b1;
         for (p = 0; p < NUM_CHANNELS; p = p + 1)
-            if (ch_runnable_i[p]) all_channels_idle_o = 1'b0;
+            if (chRunnableI[p]) allChannelsIdleO = 1'b0;
     end
     integer i;
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            current_ch          <= 0;
-            active_channel_o    <= 0;
-            ch_running_o        <= 0;
-            ch_preempt_o        <= 0;
-            ch_aged_promotion_o <= 0;
+    always @(posedge clk or negedge rstN) begin
+        if (!rstN) begin
+            currentCh          <= 0;
+            activeChannelO    <= 0;
+            chRunningO        <= 0;
+            chPreemptO        <= 0;
+            chAgedPromotionO <= 0;
             for (i = 0; i < NUM_CHANNELS; i = i + 1) begin
-                ch_state_reg[i]  <= CH_IDLE;
-                timeslice_ctr[i] <= 0;
-                aging_ctr[i]     <= 0;
-                effective_pri[i] <= 0;
+                chStateReg[i]  <= CH_IDLE;
+                timesliceCtr[i] <= 0;
+                agingCtr[i]     <= 0;
+                effectivePri[i] <= 0;
             end
         end else begin
-            ch_preempt_o        <= 0;
-            ch_aged_promotion_o <= 0;
+            chPreemptO        <= 0;
+            chAgedPromotionO <= 0;
 
             for (i = 0; i < NUM_CHANNELS; i = i + 1) begin
-                effective_pri[i] <= ch_pri(i[CH_BITS-1:0]);
+                effectivePri[i] <= chPri(i[CH_BITS-1:0]);
 
-                if (!ch_runnable_i[i]) begin
-                    ch_state_reg[i] <= CH_IDLE;
-                    aging_ctr[i]    <= 0;
-                end else if (ch_state_reg[i] == CH_IDLE && ch_runnable_i[i]) begin
-                    ch_state_reg[i] <= CH_RUNNABLE;
+                if (!chRunnableI[i]) begin
+                    chStateReg[i] <= CH_IDLE;
+                    agingCtr[i]    <= 0;
+                end else if (chStateReg[i] == CH_IDLE && chRunnableI[i]) begin
+                    chStateReg[i] <= CH_RUNNABLE;
                 end
 
-                if (ch_runnable_i[i] && ch_state_reg[i] == CH_RUNNABLE &&
-                    i[CH_BITS-1:0] != current_ch) begin
-                    aging_ctr[i] <= aging_ctr[i] + 1;
-                    if (aging_ctr[i] >= ((dcr_aging_thresh_i != 0) ? dcr_aging_thresh_i : DEFAULT_AGING_THRESH)) begin
-                        if (effective_pri[i] > 0)
-                            effective_pri[i] <= effective_pri[i] - 1;
-                        ch_aged_promotion_o[i] <= 1'b1;
-                        aging_ctr[i] <= 0;
+                if (chRunnableI[i] && chStateReg[i] == CH_RUNNABLE &&
+                    i[CH_BITS-1:0] != currentCh) begin
+                    agingCtr[i] <= agingCtr[i] + 1;
+                    if (agingCtr[i] >= ((dcrAgingThreshI != 0) ? dcrAgingThreshI : DEFAULT_AGING_THRESH)) begin
+                        if (effectivePri[i] > 0)
+                            effectivePri[i] <= effectivePri[i] - 1;
+                        chAgedPromotionO[i] <= 1'b1;
+                        agingCtr[i] <= 0;
                     end
                 end else begin
-                    aging_ctr[i] <= 0;
+                    agingCtr[i] <= 0;
                 end
             end
 
-            if (ch_running_o[current_ch]) begin
-                timeslice_ctr[current_ch] <= timeslice_ctr[current_ch] + 1;
+            if (chRunningO[currentCh]) begin
+                timesliceCtr[currentCh] <= timesliceCtr[currentCh] + 1;
             end
 
-            if (ch_running_o[current_ch]) begin
+            if (chRunningO[currentCh]) begin
 
-                if (best_valid && best_pri < effective_pri[current_ch] &&
-                    best_ch != current_ch) begin
-                    ch_preempt_o[current_ch]  <= 1'b1;
-                    ch_state_reg[current_ch]  <= CH_PREEMPTED;
-                    ch_running_o[current_ch]  <= 1'b0;
+                if (bestValid && bestPri < effectivePri[currentCh] &&
+                    bestCh != currentCh) begin
+                    chPreemptO[currentCh]  <= 1'b1;
+                    chStateReg[currentCh]  <= CH_PREEMPTED;
+                    chRunningO[currentCh]  <= 1'b0;
 
-                    current_ch                <= best_ch;
-                    active_channel_o          <= best_ch;
-                    ch_state_reg[best_ch]     <= CH_RUNNING;
-                    ch_running_o[best_ch]     <= 1'b1;
-                    timeslice_ctr[best_ch]    <= 0;
+                    currentCh                <= bestCh;
+                    activeChannelO          <= bestCh;
+                    chStateReg[bestCh]     <= CH_RUNNING;
+                    chRunningO[bestCh]     <= 1'b1;
+                    timesliceCtr[bestCh]    <= 0;
                 end
 
-                else if (timeslice_ctr[current_ch] >= get_timeslice(effective_pri[current_ch])) begin
-                    ch_state_reg[current_ch]  <= CH_RUNNABLE;
-                    ch_running_o[current_ch]  <= 1'b0;
-                    timeslice_ctr[current_ch] <= 0;
+                else if (timesliceCtr[currentCh] >= getTimeslice(effectivePri[currentCh])) begin
+                    chStateReg[currentCh]  <= CH_RUNNABLE;
+                    chRunningO[currentCh]  <= 1'b0;
+                    timesliceCtr[currentCh] <= 0;
 
-                    if (best_valid) begin
-                        current_ch             <= best_ch;
-                        active_channel_o       <= best_ch;
-                        ch_state_reg[best_ch]  <= CH_RUNNING;
-                        ch_running_o[best_ch]  <= 1'b1;
-                        timeslice_ctr[best_ch] <= 0;
+                    if (bestValid) begin
+                        currentCh             <= bestCh;
+                        activeChannelO       <= bestCh;
+                        chStateReg[bestCh]  <= CH_RUNNING;
+                        chRunningO[bestCh]  <= 1'b1;
+                        timesliceCtr[bestCh] <= 0;
                     end
                 end
             end else begin
 
-                if (best_valid) begin
-                    current_ch                <= best_ch;
-                    active_channel_o          <= best_ch;
-                    ch_state_reg[best_ch]     <= CH_RUNNING;
-                    ch_running_o[best_ch]     <= 1'b1;
-                    timeslice_ctr[best_ch]    <= 0;
+                if (bestValid) begin
+                    currentCh                <= bestCh;
+                    activeChannelO          <= bestCh;
+                    chStateReg[bestCh]     <= CH_RUNNING;
+                    chRunningO[bestCh]     <= 1'b1;
+                    timesliceCtr[bestCh]    <= 0;
                 end
             end
 
             for (i = 0; i < NUM_CHANNELS; i = i + 1) begin
-                if (ch_state_reg[i] == CH_PREEMPTED && ch_runnable_i[i])
-                    ch_state_reg[i] <= CH_RUNNABLE;
+                if (chStateReg[i] == CH_PREEMPTED && chRunnableI[i])
+                    chStateReg[i] <= CH_RUNNABLE;
             end
         end
     end
 `ifdef VERILATOR
     always @(posedge clk) begin
-        if (rst_n && |ch_preempt_o)
-            $display("[CH_SCHED] Preemption: ch%d preempted, ch%d now running", current_ch, best_ch);
+        if (rstN && |chPreemptO)
+            $display("[chSched] Preemption: ch%d preempted, ch%d now running", currentCh, bestCh);
     end
 `endif
 endmodule

@@ -1,19 +1,10 @@
-// 3D Inter-Cube Memory Sheet Interconnect
-// This is the core 3D architectural module acting as a shared SRAM sheet between adjacent compute cubes.
-// I implemented 3-port round-robin arbitration (Side A, Side B, NoC) with dynamic address decoding
-// to double theoretical bisection bandwidth (128 B/cycle) while keeping local access latency zero.
+// 3D Inter-Cube Memory Sheet - shared SRAM between adjacent compute cubes with 3-port arbitration.
 
 `default_nettype none
 `timescale 1ns/1ns
 
-// GridX3 - Memory Sheet
-// Purpose: Primary communication medium between adjacent compute cubes.
-// Architecture: Multi-banked SRAM with 3-port arbitration (Side A, Side B, NoC).
-// Requests target specific banks based on address interleaving.
-// Parameters: ADDR_WIDTH, DATA_WIDTH, NUM_BANKS, BANK_DEPTH, METADATA_BITS, SHEET_ID
-// Timing: 1-cycle read latency, 1-cycle write latency (Simplified Behavioral).
 
-module memory_sheet #(
+module memorySheet #(
     parameter ADDR_WIDTH = 13,      // Address bits into sheet SRAM
     parameter DATA_WIDTH = 8,       // Data width (byte-addressable)
     parameter NUM_BANKS = 4,        // Number of SRAM banks
@@ -25,156 +16,167 @@ module memory_sheet #(
     input  wire        reset,
 
     // Side A Interface (Face Controller A)
-    input  wire        side_a_req_valid,
-    input  wire        side_a_req_write,
-    input  wire [ADDR_WIDTH-1:0] side_a_req_addr,
-    input  wire [DATA_WIDTH-1:0] side_a_req_wdata,
-    output wire        side_a_req_ready,
+    input  wire        sideAReqValid,
+    input  wire        sideAReqWrite,
+    input  wire [ADDR_WIDTH-1:0] sideAReqAddr,
+    input  wire [DATA_WIDTH-1:0] sideAReqWdata,
+    output wire        sideAReqReady,
 
-    output reg         side_a_resp_valid,
-    output reg  [DATA_WIDTH-1:0] side_a_resp_rdata,
-    input  wire        side_a_resp_ready,
+    output reg         sideARespValid,
+    output reg  [DATA_WIDTH-1:0] sideARespRdata,
+    input  wire        sideARespReady,
 
     // Side B Interface (Face Controller B)
-    input  wire        side_b_req_valid,
-    input  wire        side_b_req_write,
-    input  wire [ADDR_WIDTH-1:0] side_b_req_addr,
-    input  wire [DATA_WIDTH-1:0] side_b_req_wdata,
-    output wire        side_b_req_ready,
+    input  wire        sideBReqValid,
+    input  wire        sideBReqWrite,
+    input  wire [ADDR_WIDTH-1:0] sideBReqAddr,
+    input  wire [DATA_WIDTH-1:0] sideBReqWdata,
+    output wire        sideBReqReady,
 
-    output reg         side_b_resp_valid,
-    output reg  [DATA_WIDTH-1:0] side_b_resp_rdata,
-    input  wire        side_b_resp_ready,
+    output reg         sideBRespValid,
+    output reg  [DATA_WIDTH-1:0] sideBRespRdata,
+    input  wire        sideBRespReady,
 
     // NoC Local Interface (MemoryMesh router local port)
-    input  wire        noc_req_valid,
-    input  wire        noc_req_write,
-    input  wire [ADDR_WIDTH-1:0] noc_req_addr,
-    input  wire [DATA_WIDTH-1:0] noc_req_wdata,
-    output wire        noc_req_ready,
+    input  wire        nocReqValid,
+    input  wire        nocReqWrite,
+    input  wire [ADDR_WIDTH-1:0] nocReqAddr,
+    input  wire [DATA_WIDTH-1:0] nocReqWdata,
+    output wire        nocReqReady,
 
-    output reg         noc_resp_valid,
-    output reg  [DATA_WIDTH-1:0] noc_resp_rdata,
-    input  wire        noc_resp_ready,
+    output reg         nocRespValid,
+    output reg  [DATA_WIDTH-1:0] nocRespRdata,
+    input  wire        nocRespReady,
 
     // Performance Counters
-    output reg  [31:0] perf_reads,
-    output reg  [31:0] perf_writes,
-    output reg  [31:0] perf_bank_conflicts,
-    output reg  [31:0] perf_side_a_accesses,
-    output reg  [31:0] perf_side_b_accesses,
-    output reg  [31:0] perf_noc_accesses,
-    output reg  [31:0] perf_merges
+    output reg  [31:0] perfReads,
+    output reg  [31:0] perfWrites,
+    output reg  [31:0] perfBankConflicts,
+    output reg  [31:0] perfSideAAccesses,
+    output reg  [31:0] perfSideBAccesses,
+    output reg  [31:0] perfNocAccesses,
+    output reg  [31:0] perfMerges
 );
 
     localparam BANK_ID_WIDTH = (NUM_BANKS > 1) ? $clog2(NUM_BANKS) : 1;
     localparam BANK_ADDR_WIDTH = $clog2(BANK_DEPTH);
 
     // SRAM Banks
-    reg [DATA_WIDTH-1:0] bank_data [NUM_BANKS-1:0][BANK_DEPTH-1:0];
-    reg [METADATA_BITS-1:0] bank_meta [NUM_BANKS-1:0][BANK_DEPTH-1:0];
+    reg [DATA_WIDTH-1:0] bankData [NUM_BANKS-1:0][BANK_DEPTH-1:0];
+    reg [METADATA_BITS-1:0] bankMeta [NUM_BANKS-1:0][BANK_DEPTH-1:0];
 
     // Request Decode & Arbitration
     
     // Address mapping: lower bits select bank, upper bits are bank address
-    wire [BANK_ID_WIDTH-1:0] a_bank_id   = (NUM_BANKS > 1) ? side_a_req_addr[BANK_ID_WIDTH-1:0] : '0;
-    wire [BANK_ADDR_WIDTH-1:0] a_bank_addr = (NUM_BANKS > 1) ? side_a_req_addr[BANK_ID_WIDTH +: BANK_ADDR_WIDTH] : side_a_req_addr[BANK_ADDR_WIDTH-1:0];
+    wire [BANK_ID_WIDTH-1:0] aBankId   = (NUM_BANKS > 1) ? sideAReqAddr[BANK_ID_WIDTH-1:0] : '0;
+    wire [BANK_ADDR_WIDTH-1:0] aBankAddr = (NUM_BANKS > 1) ? sideAReqAddr[BANK_ID_WIDTH +: BANK_ADDR_WIDTH] : sideAReqAddr[BANK_ADDR_WIDTH-1:0];
     
-    wire [BANK_ID_WIDTH-1:0] b_bank_id   = (NUM_BANKS > 1) ? side_b_req_addr[BANK_ID_WIDTH-1:0] : '0;
-    wire [BANK_ADDR_WIDTH-1:0] b_bank_addr = (NUM_BANKS > 1) ? side_b_req_addr[BANK_ID_WIDTH +: BANK_ADDR_WIDTH] : side_b_req_addr[BANK_ADDR_WIDTH-1:0];
+    wire [BANK_ID_WIDTH-1:0] bBankId   = (NUM_BANKS > 1) ? sideBReqAddr[BANK_ID_WIDTH-1:0] : '0;
+    wire [BANK_ADDR_WIDTH-1:0] bBankAddr = (NUM_BANKS > 1) ? sideBReqAddr[BANK_ID_WIDTH +: BANK_ADDR_WIDTH] : sideBReqAddr[BANK_ADDR_WIDTH-1:0];
 
-    wire [BANK_ID_WIDTH-1:0] n_bank_id   = (NUM_BANKS > 1) ? noc_req_addr[BANK_ID_WIDTH-1:0] : '0;
-    wire [BANK_ADDR_WIDTH-1:0] n_bank_addr = (NUM_BANKS > 1) ? noc_req_addr[BANK_ID_WIDTH +: BANK_ADDR_WIDTH] : noc_req_addr[BANK_ADDR_WIDTH-1:0];
+    wire [BANK_ID_WIDTH-1:0] nBankId   = (NUM_BANKS > 1) ? nocReqAddr[BANK_ID_WIDTH-1:0] : '0;
+    wire [BANK_ADDR_WIDTH-1:0] nBankAddr = (NUM_BANKS > 1) ? nocReqAddr[BANK_ID_WIDTH +: BANK_ADDR_WIDTH] : nocReqAddr[BANK_ADDR_WIDTH-1:0];
 
     // Fixed priority arbitration (A > B > NoC)
     // Bank conflict only blocks lower-priority requesters targeting the same bank.
     
-    wire a_grant = side_a_req_valid;
-    wire b_grant = side_b_req_valid && (!a_grant || (b_bank_id != a_bank_id));
-    wire n_grant = noc_req_valid && (!a_grant || (n_bank_id != a_bank_id)) && (!b_grant || (n_bank_id != b_bank_id));
+    wire aGrant = sideAReqValid;
+    wire bGrant = sideBReqValid && (!aGrant || (bBankId != aBankId));
+    wire nGrant = nocReqValid && (!aGrant || (nBankId != aBankId)) && (!bGrant || (nBankId != bBankId));
 
-    assign side_a_req_ready = a_grant;
-    assign side_b_req_ready = b_grant;
-    assign noc_req_ready    = n_grant;
+    assign sideAReqReady = aGrant;
+    assign sideBReqReady = bGrant;
+    assign nocReqReady    = nGrant;
 
     // Sim-only memory initialization (ASIC starts undefined, testbenches rely on zero)
 `ifndef SYNTHESIS
-    integer b_init, w_init;
+    integer bInit, wInit;
     initial begin
-        for (b_init = 0; b_init < NUM_BANKS; b_init = b_init + 1)
-            for (w_init = 0; w_init < BANK_DEPTH; w_init = w_init + 1)
-                bank_data[b_init][w_init] = '0;
+        for (bInit = 0; bInit < NUM_BANKS; bInit = bInit + 1)
+            for (wInit = 0; wInit < BANK_DEPTH; wInit = wInit + 1)
+                bankData[bInit][wInit] = '0;
     end
 `endif
 
     // Memory Access & Response
     always @(posedge clk) begin
         if (reset) begin
-            side_a_resp_valid <= 1'b0;
-            side_b_resp_valid <= 1'b0;
-            noc_resp_valid    <= 1'b0;
-            side_a_resp_rdata <= '0;
-            side_b_resp_rdata <= '0;
-            noc_resp_rdata    <= '0;
+            sideARespValid <= 1'b0;
+            sideBRespValid <= 1'b0;
+            nocRespValid    <= 1'b0;
+            sideARespRdata <= '0;
+            sideBRespRdata <= '0;
+            nocRespRdata    <= '0;
             
-            perf_reads <= '0;
-            perf_writes <= '0;
-            perf_bank_conflicts <= '0;
-            perf_side_a_accesses <= '0;
-            perf_side_b_accesses <= '0;
-            perf_noc_accesses <= '0;
-            perf_merges <= '0;
+            perfReads <= '0;
+            perfWrites <= '0;
+            perfBankConflicts <= '0;
+            perfSideAAccesses <= '0;
+            perfSideBAccesses <= '0;
+            perfNocAccesses <= '0;
+            perfMerges <= '0;
         end else begin
 
             // Default responses to invalid
-            side_a_resp_valid <= 1'b0;
-            side_b_resp_valid <= 1'b0;
-            noc_resp_valid    <= 1'b0;
+            sideARespValid <= 1'b0;
+            sideBRespValid <= 1'b0;
+            nocRespValid    <= 1'b0;
             
             // Cycle 0: Process new requests (1-cycle read/write for behavioral SRAM)
-            if (a_grant) begin
-                perf_side_a_accesses <= perf_side_a_accesses + 1;
-                if (side_a_req_write) begin
-                    bank_data[a_bank_id][a_bank_addr] <= side_a_req_wdata;
-                    perf_writes <= perf_writes + 1;
+            if (aGrant) begin
+                perfSideAAccesses <= perfSideAAccesses + 1;
+                if (sideAReqWrite) begin
+                    bankData[aBankId][aBankAddr] <= sideAReqWdata;
+                    perfWrites <= perfWrites + 1;
                 end else begin
-                    side_a_resp_valid <= 1'b1;
-                    side_a_resp_rdata <= bank_data[a_bank_id][a_bank_addr];
-                    perf_reads <= perf_reads + 1;
+                    sideARespValid <= 1'b1;
+                    sideARespRdata <= bankData[aBankId][aBankAddr];
+                    perfReads <= perfReads + 1;
                 end
-            end else if (side_a_req_valid) begin
+            end else if (sideAReqValid) begin
                  // A request is always granted first priority, so it shouldn't conflict,
                  // but tracked for completeness.
-                 perf_bank_conflicts <= perf_bank_conflicts + 1;
+                 perfBankConflicts <= perfBankConflicts + 1;
             end
 
-            if (b_grant) begin
-                perf_side_b_accesses <= perf_side_b_accesses + 1;
-                if (side_b_req_write) begin
-                    bank_data[b_bank_id][b_bank_addr] <= side_b_req_wdata;
-                    perf_writes <= perf_writes + 1;
+            if (bGrant) begin
+                perfSideBAccesses <= perfSideBAccesses + 1;
+                if (sideBReqWrite) begin
+                    bankData[bBankId][bBankAddr] <= sideBReqWdata;
+                    perfWrites <= perfWrites + 1;
                 end else begin
-                    side_b_resp_valid <= 1'b1;
-                    side_b_resp_rdata <= bank_data[b_bank_id][b_bank_addr];
-                    perf_reads <= perf_reads + 1;
+                    sideBRespValid <= 1'b1;
+                    sideBRespRdata <= bankData[bBankId][bBankAddr];
+                    perfReads <= perfReads + 1;
                 end
-            end else if (side_b_req_valid) begin
-                perf_bank_conflicts <= perf_bank_conflicts + 1;
+            end else if (sideBReqValid) begin
+                perfBankConflicts <= perfBankConflicts + 1;
             end
 
-            if (n_grant) begin
-                perf_noc_accesses <= perf_noc_accesses + 1;
-                if (noc_req_write) begin
-                    bank_data[n_bank_id][n_bank_addr] <= noc_req_wdata;
-                    perf_writes <= perf_writes + 1;
+            if (nGrant) begin
+                perfNocAccesses <= perfNocAccesses + 1;
+                if (nocReqWrite) begin
+                    bankData[nBankId][nBankAddr] <= nocReqWdata;
+                    perfWrites <= perfWrites + 1;
                 end else begin
-                    noc_resp_valid <= 1'b1;
-                    noc_resp_rdata <= bank_data[n_bank_id][n_bank_addr];
-                    perf_reads <= perf_reads + 1;
+                    nocRespValid <= 1'b1;
+                    nocRespRdata <= bankData[nBankId][nBankAddr];
+                    perfReads <= perfReads + 1;
                 end
-            end else if (noc_req_valid) begin
-                perf_bank_conflicts <= perf_bank_conflicts + 1;
+            end else if (nocReqValid) begin
+                perfBankConflicts <= perfBankConflicts + 1;
             end
         end
     end
+    // Q6 Proof: Dump memory contents
+    final begin
+        for (int b = 0; b < NUM_BANKS; b++) begin
+            for (int w = 0; w < BANK_DEPTH; w++) begin
+                if (bankData[b][w] !== '0 && bankData[b][w] !== {DATA_WIDTH{1'bx}}) begin
+                    $display("[HBM_DUMP] Sheet=%0d Bank=%0d Addr=0x%0x Data=0x%0x", SHEET_ID, b, w, bankData[b][w]);
+                end
+            end
+        end
+    end
+
 endmodule

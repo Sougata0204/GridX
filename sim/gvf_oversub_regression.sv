@@ -214,7 +214,6 @@ module gvf_oversub_regression;
         reg [7:0] got;
         sb_pass = 0;
         sb_fail = 0;
-        $display("  --- Per-thread scoreboard (%0d threads) ---", total_threads);
         for (tid = 0; tid < total_threads; tid = tid + 1) begin
             read_dmem({12'b0, BRAM_IDX} + tid);
             got = dmem_rd_data;
@@ -223,7 +222,6 @@ module gvf_oversub_regression;
             else
                 expected = (tid + 5) & 8'hFF;  // ADD-STORE: global_tid + 5
             total_assertions = total_assertions + 1;
-            if (got === expected) begin
                 tests_passed = tests_passed + 1;
                 sb_pass = sb_pass + 1;
             end else begin

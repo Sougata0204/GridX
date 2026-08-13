@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module mem_coalescer #(
+module memCoalescer #(
     parameter THREADS_PER_WARP = 4,
     parameter ADDR_WIDTH = 16,
     parameter DATA_WIDTH = 8,
@@ -11,23 +11,23 @@ module mem_coalescer #(
 ) (
     input  wire clk,
     input  wire reset,
-    input  wire [THREADS_PER_WARP-1:0] req_valid,
-    input  wire [THREADS_PER_WARP-1:0] req_write,
-    input  wire [ADDR_WIDTH-1:0] req_addr [THREADS_PER_WARP-1:0],
-    input  wire [DATA_WIDTH-1:0] req_wdata [THREADS_PER_WARP-1:0],
-    output wire [THREADS_PER_WARP-1:0] req_ready,
-    output reg  [DATA_WIDTH-1:0] req_rdata [THREADS_PER_WARP-1:0],
-    output reg  coal_valid,
-    output reg  coal_write,
-    output reg  [ADDR_WIDTH-1:0] coal_addr,
-    output reg  [CACHE_LINE_SIZE*8-1:0] coal_wdata,
-    output reg  [CACHE_LINE_SIZE-1:0] coal_wmask,
-    input  wire coal_ready,
-    input  wire [CACHE_LINE_SIZE*8-1:0] coal_rdata,
-    output wire coalescer_busy,
-    output reg  [31:0] total_requests,
-    output reg  [31:0] coalesced_transactions,
-    output reg  [15:0] coalesce_ratio
+    input  wire [THREADS_PER_WARP-1:0] reqValid,
+    input  wire [THREADS_PER_WARP-1:0] reqWrite,
+    input  wire [ADDR_WIDTH-1:0] reqAddr [THREADS_PER_WARP-1:0],
+    input  wire [DATA_WIDTH-1:0] reqWdata [THREADS_PER_WARP-1:0],
+    output wire [THREADS_PER_WARP-1:0] reqReady,
+    output reg  [DATA_WIDTH-1:0] reqRdata [THREADS_PER_WARP-1:0],
+    output reg  coalValid,
+    output reg  coalWrite,
+    output reg  [ADDR_WIDTH-1:0] coalAddr,
+    output reg  [CACHE_LINE_SIZE*8-1:0] coalWdata,
+    output reg  [CACHE_LINE_SIZE-1:0] coalWmask,
+    input  wire coalReady,
+    input  wire [CACHE_LINE_SIZE*8-1:0] coalRdata,
+    output wire coalescerBusy,
+    output reg  [31:0] totalRequests,
+    output reg  [31:0] coalescedTransactions,
+    output reg  [15:0] coalesceRatio
 );
     localparam OFFSET_BITS = $clog2(CACHE_LINE_SIZE);
     localparam IDLE = 2'b00;
@@ -35,36 +35,36 @@ module mem_coalescer #(
     localparam WAITING = 2'b10;
     localparam DISTRIBUTING = 2'b11;
     reg [1:0] state;
-    wire [LINE_ADDR_BITS-1:0] thread_line [THREADS_PER_WARP-1:0];
-    wire [OFFSET_BITS-1:0] thread_offset [THREADS_PER_WARP-1:0];
+    wire [LINE_ADDR_BITS-1:0] threadLine [THREADS_PER_WARP-1:0];
+    wire [OFFSET_BITS-1:0] threadOffset [THREADS_PER_WARP-1:0];
     genvar t;
     generate
-        for (t = 0; t < THREADS_PER_WARP; t++) begin : addr_decode
-            assign thread_line[t] = req_addr[t][ADDR_WIDTH-1:OFFSET_BITS];
-            assign thread_offset[t] = req_addr[t][OFFSET_BITS-1:0];
+        for (t = 0; t < THREADS_PER_WARP; t++) begin : addrDecode
+            assign threadLine[t] = reqAddr[t][ADDR_WIDTH-1:OFFSET_BITS];
+            assign threadOffset[t] = reqAddr[t][OFFSET_BITS-1:0];
         end
     endgenerate
-    reg [LINE_ADDR_BITS-1:0] primary_line;
-    reg found_primary;
-    reg [THREADS_PER_WARP-1:0] same_line_mask;
+    reg [LINE_ADDR_BITS-1:0] primaryLine;
+    reg foundPrimary;
+    reg [THREADS_PER_WARP-1:0] sameLineMask;
     always @(*) begin
-        found_primary = 0;
-        primary_line = 0;
-        same_line_mask = 0;
+        foundPrimary = 0;
+        primaryLine = 0;
+        sameLineMask = 0;
         for (int i = 0; i < THREADS_PER_WARP; i++) begin
-            if (req_valid[i] && !found_primary) begin
-                primary_line = thread_line[i];
-                found_primary = 1;
+            if (reqValid[i] && !foundPrimary) begin
+                primaryLine = threadLine[i];
+                foundPrimary = 1;
             end
         end
         for (int i = 0; i < THREADS_PER_WARP; i++) begin
-            if (req_valid[i] && (thread_line[i] == primary_line)) begin
-                same_line_mask[i] = 1;
+            if (reqValid[i] && (threadLine[i] == primaryLine)) begin
+                sameLineMask[i] = 1;
             end
         end
     end
 
-    function automatic int count_bits;
+    function automatic int countBits;
         input [THREADS_PER_WARP-1:0] vec;
         int cnt;
         begin
@@ -72,74 +72,74 @@ module mem_coalescer #(
             for (int i = 0; i < THREADS_PER_WARP; i++) begin
                 if (vec[i]) cnt = cnt + 1;
             end
-            count_bits = cnt;
+            countBits = cnt;
         end
     endfunction
     reg [THREADS_PER_WARP-1:0] pending;
-    reg [THREADS_PER_WARP-1:0] current_batch;
-    assign coalescer_busy = (state != IDLE) || (|pending);
-    assign req_ready = (state == IDLE) ? {THREADS_PER_WARP{1'b1}} : {THREADS_PER_WARP{1'b0}};
+    reg [THREADS_PER_WARP-1:0] currentBatch;
+    assign coalescerBusy = (state != IDLE) || (|pending);
+    assign reqReady = (state == IDLE) ? {THREADS_PER_WARP{1'b1}} : {THREADS_PER_WARP{1'b0}};
     integer i;
     always @(posedge clk) begin
         if (reset) begin
             state <= IDLE;
             pending <= 0;
-            current_batch <= 0;
-            coal_valid <= 0;
-            coal_write <= 0;
-            coal_addr <= 0;
-            coal_wdata <= 0;
-            coal_wmask <= 0;
-            total_requests <= 0;
-            coalesced_transactions <= 0;
-            coalesce_ratio <= 0;
+            currentBatch <= 0;
+            coalValid <= 0;
+            coalWrite <= 0;
+            coalAddr <= 0;
+            coalWdata <= 0;
+            coalWmask <= 0;
+            totalRequests <= 0;
+            coalescedTransactions <= 0;
+            coalesceRatio <= 0;
             for (i = 0; i < THREADS_PER_WARP; i++) begin
-                req_rdata[i] <= 0;
+                reqRdata[i] <= 0;
             end
         end else begin
             case (state)
                 IDLE: begin
-                    if (|req_valid) begin
-                        pending <= req_valid;
-                        total_requests <= total_requests + count_bits(req_valid);
+                    if (|reqValid) begin
+                        pending <= reqValid;
+                        totalRequests <= totalRequests + countBits(reqValid);
                         state <= COALESCING;
                     end
                 end
                 COALESCING: begin
                     if (|pending) begin
-                        current_batch <= pending & same_line_mask;
-                        coal_valid <= 1;
-                        coal_write <= req_write[0];
-                        coal_addr <= {primary_line, {OFFSET_BITS{1'b0}}};
-                        coal_wmask <= 0;
-                        coal_wdata <= 0;
+                        currentBatch <= pending & sameLineMask;
+                        coalValid <= 1;
+                        coalWrite <= reqWrite[0];
+                        coalAddr <= {primaryLine, {OFFSET_BITS{1'b0}}};
+                        coalWmask <= 0;
+                        coalWdata <= 0;
                         for (i = 0; i < THREADS_PER_WARP; i++) begin
-                            if (pending[i] && same_line_mask[i]) begin
-                                coal_wmask[thread_offset[i]] <= 1;
-                                coal_wdata[thread_offset[i]*8 +: 8] <= req_wdata[i];
+                            if (pending[i] && sameLineMask[i]) begin
+                                coalWmask[threadOffset[i]] <= 1;
+                                coalWdata[threadOffset[i]*8 +: 8] <= reqWdata[i];
                             end
                         end
-                        coalesced_transactions <= coalesced_transactions + 1;
+                        coalescedTransactions <= coalescedTransactions + 1;
                         state <= WAITING;
                     end else begin
                         state <= IDLE;
                     end
                 end
                 WAITING: begin
-                    if (coal_ready) begin
-                        coal_valid <= 0;
+                    if (coalReady) begin
+                        coalValid <= 0;
                         for (i = 0; i < THREADS_PER_WARP; i++) begin
-                            if (current_batch[i]) begin
-                                req_rdata[i] <= coal_rdata[thread_offset[i]*8 +: 8];
+                            if (currentBatch[i]) begin
+                                reqRdata[i] <= coalRdata[threadOffset[i]*8 +: 8];
                             end
                         end
-                        pending <= pending & ~current_batch;
-                        if (|(pending & ~current_batch)) begin
+                        pending <= pending & ~currentBatch;
+                        if (|(pending & ~currentBatch)) begin
                             state <= COALESCING;
                         end else begin
                             state <= IDLE;
-                            if (coalesced_transactions > 0) begin
-                                coalesce_ratio <= (total_requests << 8) / coalesced_transactions;
+                            if (coalescedTransactions > 0) begin
+                                coalesceRatio <= (totalRequests << 8) / coalescedTransactions;
                             end
                         end
                     end

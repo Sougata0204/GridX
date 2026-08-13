@@ -1,11 +1,11 @@
-// `default_nettype none  -- removed: module uses `logic` typed ports
+`default_nettype wire
 `timescale 1ps/1ps
 
 import gridx_mem_pkg::*;
 
 module mem_mesh_router (
-    input  logic clk,
-    input  logic rst_n,
+    input  wire clk,
+    input  wire rst_n,
 
     input  coord_t my_coord,
 
@@ -215,14 +215,18 @@ module mem_mesh_router (
                 end
             end
         end else begin
+            automatic reg [CREDIT_WIDTH-1:0] next_ds_credits [NUM_PORTS-1:0][NUM_VCS-1:0];
 
             for (int p = 0; p < NUM_PORTS; p++)
                 credit_out[p].valid <= 1'b0;
 
             for (int p = 0; p < NUM_PORTS; p++) begin
-                if (credit_in[p].valid)
-                    downstream_credits[p][credit_in[p].vc_id] <=
-                        downstream_credits[p][credit_in[p].vc_id] + 1'b1;
+                for (int v = 0; v < NUM_VCS; v++) begin
+                    next_ds_credits[p][v] = downstream_credits[p][v];
+                end
+                if (credit_in[p].valid) begin
+                    next_ds_credits[p][credit_in[p].vc_id] = next_ds_credits[p][credit_in[p].vc_id] + 1'b1;
+                end
             end
 
             for (int p = 0; p < NUM_PORTS; p++) begin
@@ -277,8 +281,7 @@ module mem_mesh_router (
                     rd_ptr[wp][wv]     <= rd_ptr[wp][wv] + 1'b1;
                     fifo_count[wp][wv] <= fifo_count[wp][wv] - 1'b1;
 
-                    downstream_credits[out_p][wv] <=
-                        downstream_credits[out_p][wv] - 1'b1;
+                    next_ds_credits[out_p][wv] = next_ds_credits[out_p][wv] - 1'b1;
 
                     credit_out[wp].valid <= 1'b1;
                     credit_out[wp].vc_id <= wv;
@@ -294,6 +297,12 @@ module mem_mesh_router (
 
                         ovc_state[out_p][wv] <= OVC_IDLE;
                     end
+                end
+            end
+
+            for (int p = 0; p < NUM_PORTS; p++) begin
+                for (int v = 0; v < NUM_VCS; v++) begin
+                    downstream_credits[p][v] <= next_ds_credits[p][v];
                 end
             end
 
@@ -334,5 +343,18 @@ module mem_mesh_router (
         end
     endgenerate
 `endif
+
+    // Q2 Proof: Dump final router states
+    final begin : router_credits
+        int min_credits = 999;
+        for (int p=0; p<NUM_PORTS; p++) begin
+            for (int v=0; v<NUM_VCS; v++) begin
+                if (downstream_credits[p][v] < min_credits)
+                    min_credits = downstream_credits[p][v];
+            end
+        end
+        $display("[ROUTER_CREDITS] Node[%0d,%0d,%0d] Minimum downstream_credits across all ports/VCs = %0d (Expected: %0d)", 
+                 my_coord.x, my_coord.y, my_coord.z, min_credits, FLITS_PER_BUFFER);
+    end
 
 endmodule

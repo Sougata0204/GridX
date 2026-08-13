@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ps
 
-module bank_arbiter #(
+module bankArbiter #(
     parameter NUM_REQUESTERS = 4,
     parameter NUM_BANKS = 4,
     parameter NUM_WARPS = 1,
@@ -12,99 +12,99 @@ module bank_arbiter #(
 ) (
     input wire clk,
     input wire reset,
-    input wire [NUM_REQUESTERS-1:0] request_valid,
-    input wire [BANK_BITS-1:0] request_bank [NUM_REQUESTERS-1:0],
-    input wire [NUM_REQUESTERS-1:0] request_is_write,
+    input wire [NUM_REQUESTERS-1:0] requestValid,
+    input wire [BANK_BITS-1:0] requestBank [NUM_REQUESTERS-1:0],
+    input wire [NUM_REQUESTERS-1:0] requestIsWrite,
     output reg [NUM_REQUESTERS-1:0] grant,
-    output reg [NUM_REQUESTERS-1:0] bank_conflict,
-    output reg [NUM_WARPS-1:0] warp_stall,
-    output reg [7:0] warp_conflict_count [NUM_WARPS-1:0],
-    output reg [7:0] warp_grant_count [NUM_WARPS-1:0],
-    output reg [NUM_BANKS-1:0] bank_read_enable,
-    output reg [NUM_BANKS-1:0] bank_write_enable,
-    output reg [$clog2(NUM_REQUESTERS)-1:0] bank_owner [NUM_BANKS-1:0]
+    output reg [NUM_REQUESTERS-1:0] bankConflict,
+    output reg [NUM_WARPS-1:0] warpStall,
+    output reg [7:0] warpConflictCount [NUM_WARPS-1:0],
+    output reg [7:0] warpGrantCount [NUM_WARPS-1:0],
+    output reg [NUM_BANKS-1:0] bankReadEnable,
+    output reg [NUM_BANKS-1:0] bankWriteEnable,
+    output reg [$clog2(NUM_REQUESTERS)-1:0] bankOwner [NUM_BANKS-1:0]
 );
-    reg [$clog2(NUM_REQUESTERS)-1:0] priority_ptr [NUM_BANKS-1:0];
-    reg [NUM_REQUESTERS-1:0] bank_requesters [NUM_BANKS-1:0];
-    reg [NUM_BANKS-1:0] bank_has_request;
-    reg [$clog2(NUM_REQUESTERS)-1:0] selected_requester [NUM_BANKS-1:0];
-    reg [NUM_WARPS-1:0] warp_has_conflict;
-    reg [NUM_WARPS-1:0] warp_has_grant;
+    reg [$clog2(NUM_REQUESTERS)-1:0] priorityPtr [NUM_BANKS-1:0];
+    reg [NUM_REQUESTERS-1:0] bankRequesters [NUM_BANKS-1:0];
+    reg [NUM_BANKS-1:0] bankHasRequest;
+    reg [$clog2(NUM_REQUESTERS)-1:0] selectedRequester [NUM_BANKS-1:0];
+    reg [NUM_WARPS-1:0] warpHasConflict;
+    reg [NUM_WARPS-1:0] warpHasGrant;
     integer i, j, k, w;
 
-    function [WARP_BITS-1:0] get_warp_id;
-        input [$clog2(NUM_REQUESTERS)-1:0] thread_id;
+    function [WARP_BITS-1:0] getWarpId;
+        input [$clog2(NUM_REQUESTERS)-1:0] threadId;
         begin
-            get_warp_id = thread_id / THREADS_PER_WARP;
+            getWarpId = threadId / THREADS_PER_WARP;
         end
     endfunction
     always @(posedge clk) begin
         if (reset) begin
             grant <= {NUM_REQUESTERS{1'b0}};
-            bank_conflict <= {NUM_REQUESTERS{1'b0}};
-            warp_stall <= {NUM_WARPS{1'b0}};
-            bank_read_enable <= {NUM_BANKS{1'b0}};
-            bank_write_enable <= {NUM_BANKS{1'b0}};
+            bankConflict <= {NUM_REQUESTERS{1'b0}};
+            warpStall <= {NUM_WARPS{1'b0}};
+            bankReadEnable <= {NUM_BANKS{1'b0}};
+            bankWriteEnable <= {NUM_BANKS{1'b0}};
             for (i = 0; i < NUM_BANKS; i = i + 1) begin
-                priority_ptr[i] <= 0;
-                bank_owner[i] <= 0;
+                priorityPtr[i] <= 0;
+                bankOwner[i] <= 0;
             end
             for (w = 0; w < NUM_WARPS; w = w + 1) begin
-                warp_conflict_count[w] <= 0;
-                warp_grant_count[w] <= 0;
+                warpConflictCount[w] <= 0;
+                warpGrantCount[w] <= 0;
             end
         end else begin
             grant <= {NUM_REQUESTERS{1'b0}};
-            bank_conflict <= {NUM_REQUESTERS{1'b0}};
-            warp_stall <= {NUM_WARPS{1'b0}};
-            bank_read_enable <= {NUM_BANKS{1'b0}};
-            bank_write_enable <= {NUM_BANKS{1'b0}};
-            warp_has_conflict = {NUM_WARPS{1'b0}};
-            warp_has_grant = {NUM_WARPS{1'b0}};
+            bankConflict <= {NUM_REQUESTERS{1'b0}};
+            warpStall <= {NUM_WARPS{1'b0}};
+            bankReadEnable <= {NUM_BANKS{1'b0}};
+            bankWriteEnable <= {NUM_BANKS{1'b0}};
+            warpHasConflict = {NUM_WARPS{1'b0}};
+            warpHasGrant = {NUM_WARPS{1'b0}};
             for (i = 0; i < NUM_BANKS; i = i + 1) begin
-                bank_requesters[i] = {NUM_REQUESTERS{1'b0}};
-                bank_has_request[i] = 1'b0;
+                bankRequesters[i] = {NUM_REQUESTERS{1'b0}};
+                bankHasRequest[i] = 1'b0;
             end
             for (j = 0; j < NUM_REQUESTERS; j = j + 1) begin
-                if (request_valid[j]) begin
-                    bank_requesters[request_bank[j]][j] = 1'b1;
-                    bank_has_request[request_bank[j]] = 1'b1;
+                if (requestValid[j]) begin
+                    bankRequesters[requestBank[j]][j] = 1'b1;
+                    bankHasRequest[requestBank[j]] = 1'b1;
                 end
             end
             for (i = 0; i < NUM_BANKS; i = i + 1) begin
-                if (bank_has_request[i]) begin
-                    reg found_req;
-                    selected_requester[i] = priority_ptr[i];
-                    found_req = 0;
+                if (bankHasRequest[i]) begin
+                    reg foundReq;
+                    selectedRequester[i] = priorityPtr[i];
+                    foundReq = 0;
                     for (k = 0; k < NUM_REQUESTERS; k = k + 1) begin
-                        if (!found_req && bank_requesters[i][(priority_ptr[i] + k) % NUM_REQUESTERS]) begin
-                            selected_requester[i] = (priority_ptr[i] + k) % NUM_REQUESTERS;
-                            found_req = 1;
+                        if (!foundReq && bankRequesters[i][(priorityPtr[i] + k) % NUM_REQUESTERS]) begin
+                            selectedRequester[i] = (priorityPtr[i] + k) % NUM_REQUESTERS;
+                            foundReq = 1;
                         end
                     end
-                    grant[selected_requester[i]] <= 1'b1;
-                    bank_owner[i] <= selected_requester[i];
-                    warp_has_grant[get_warp_id(selected_requester[i])] = 1'b1;
-                    warp_grant_count[get_warp_id(selected_requester[i])] <=
-                        warp_grant_count[get_warp_id(selected_requester[i])] + 1;
-                    if (request_is_write[selected_requester[i]]) begin
-                        bank_write_enable[i] <= 1'b1;
+                    grant[selectedRequester[i]] <= 1'b1;
+                    bankOwner[i] <= selectedRequester[i];
+                    warpHasGrant[getWarpId(selectedRequester[i])] = 1'b1;
+                    warpGrantCount[getWarpId(selectedRequester[i])] <=
+                        warpGrantCount[getWarpId(selectedRequester[i])] + 1;
+                    if (requestIsWrite[selectedRequester[i]]) begin
+                        bankWriteEnable[i] <= 1'b1;
                     end else begin
-                        bank_read_enable[i] <= 1'b1;
+                        bankReadEnable[i] <= 1'b1;
                     end
-                    priority_ptr[i] <= (selected_requester[i] + 1) % NUM_REQUESTERS;
+                    priorityPtr[i] <= (selectedRequester[i] + 1) % NUM_REQUESTERS;
                     for (j = 0; j < NUM_REQUESTERS; j = j + 1) begin
-                        if (bank_requesters[i][j] && (j != selected_requester[i])) begin
-                            bank_conflict[j] <= 1'b1;
-                            warp_has_conflict[get_warp_id(j)] = 1'b1;
-                            warp_conflict_count[get_warp_id(j)] <=
-                                warp_conflict_count[get_warp_id(j)] + 1;
+                        if (bankRequesters[i][j] && (j != selectedRequester[i])) begin
+                            bankConflict[j] <= 1'b1;
+                            warpHasConflict[getWarpId(j)] = 1'b1;
+                            warpConflictCount[getWarpId(j)] <=
+                                warpConflictCount[getWarpId(j)] + 1;
                         end
                     end
                 end
             end
             for (w = 0; w < NUM_WARPS; w = w + 1) begin
-                warp_stall[w] <= warp_has_conflict[w];
+                warpStall[w] <= warpHasConflict[w];
             end
         end
     end
@@ -112,25 +112,25 @@ module bank_arbiter #(
     always @(posedge clk) begin
         if (!reset) begin
             for (i = 0; i < NUM_BANKS; i = i + 1) begin
-                assert(!(bank_read_enable[i] && bank_write_enable[i]))
+                assert(!(bankReadEnable[i] && bankWriteEnable[i]))
                     else $error("ILLEGAL: Simultaneous read/write to bank %d", i);
             end
         end
     end
-    reg [7:0] wait_counter [NUM_REQUESTERS-1:0];
+    reg [7:0] waitCounter [NUM_REQUESTERS-1:0];
     always @(posedge clk) begin
         if (reset) begin
             for (j = 0; j < NUM_REQUESTERS; j = j + 1) begin
-                wait_counter[j] <= 0;
+                waitCounter[j] <= 0;
             end
         end else begin
             for (j = 0; j < NUM_REQUESTERS; j = j + 1) begin
-                if (request_valid[j] && !grant[j]) begin
-                    wait_counter[j] <= wait_counter[j] + 1;
-                    assert(wait_counter[j] < NUM_REQUESTERS * 2)
+                if (requestValid[j] && !grant[j]) begin
+                    waitCounter[j] <= waitCounter[j] + 1;
+                    assert(waitCounter[j] < NUM_REQUESTERS * 2)
                         else $error("STARVATION: Requester %d waiting too long", j);
                 end else begin
-                    wait_counter[j] <= 0;
+                    waitCounter[j] <= 0;
                 end
             end
         end

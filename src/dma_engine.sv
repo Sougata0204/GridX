@@ -5,7 +5,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module dma_engine #(
+module dmaEngine #(
     parameter ADDR_BITS = 8,
     parameter DATA_WIDTH = 64,
     parameter BURST_SIZE = 8,
@@ -14,32 +14,32 @@ module dma_engine #(
 ) (
     input wire clk,
     input wire reset,
-    input wire cmd_valid,
-    input wire cmd_direction,
-    input wire [ADDR_BITS-1:0] cmd_ext_addr,
-    input wire [SRAM_ADDR_BITS-1:0] cmd_sram_addr,
-    input wire [7:0] cmd_length,
-    output reg cmd_ready,
-    output reg cmd_done,
-    output reg cmd_error,
-    output reg ext_read_valid,
-    output reg [ADDR_BITS-1:0] ext_read_address,
-    input wire ext_read_ready,
-    input wire [DATA_WIDTH-1:0] ext_read_data,
-    output reg ext_write_valid,
-    output reg [ADDR_BITS-1:0] ext_write_address,
-    output reg [DATA_WIDTH-1:0] ext_write_data,
-    input wire ext_write_ready,
-    output reg sram_read_valid,
-    output reg [SRAM_ADDR_BITS-1:0] sram_read_address,
-    input wire sram_read_ready,
-    input wire [DATA_WIDTH-1:0] sram_read_data,
-    output reg sram_write_valid,
-    output reg [SRAM_ADDR_BITS-1:0] sram_write_address,
-    output reg [DATA_WIDTH-1:0] sram_write_data,
-    input wire sram_write_ready,
+    input wire cmdValid,
+    input wire cmdDirection,
+    input wire [ADDR_BITS-1:0] cmdExtAddr,
+    input wire [SRAM_ADDR_BITS-1:0] cmdSramAddr,
+    input wire [7:0] cmdLength,
+    output reg cmdReady,
+    output reg cmdDone,
+    output reg cmdError,
+    output reg extReadValid,
+    output reg [ADDR_BITS-1:0] extReadAddress,
+    input wire extReadReady,
+    input wire [DATA_WIDTH-1:0] extReadData,
+    output reg extWriteValid,
+    output reg [ADDR_BITS-1:0] extWriteAddress,
+    output reg [DATA_WIDTH-1:0] extWriteData,
+    input wire extWriteReady,
+    output reg sramReadValid,
+    output reg [SRAM_ADDR_BITS-1:0] sramReadAddress,
+    input wire sramReadReady,
+    input wire [DATA_WIDTH-1:0] sramReadData,
+    output reg sramWriteValid,
+    output reg [SRAM_ADDR_BITS-1:0] sramWriteAddress,
+    output reg [DATA_WIDTH-1:0] sramWriteData,
+    input wire sramWriteReady,
     output reg busy,
-    output reg [7:0] words_transferred
+    output reg [7:0] wordsTransferred
 );
     localparam IDLE = 3'b000,
                LOAD_CMD = 3'b001,
@@ -51,47 +51,47 @@ module dma_engine #(
                ERROR = 3'b111;
     reg [2:0] state;
     reg direction;
-    reg [ADDR_BITS-1:0] ext_addr;
-    reg [SRAM_ADDR_BITS-1:0] sram_addr;
+    reg [ADDR_BITS-1:0] extAddr;
+    reg [SRAM_ADDR_BITS-1:0] sramAddr;
     reg [7:0] remaining;
-    reg [DATA_WIDTH-1:0] data_buffer;
+    reg [DATA_WIDTH-1:0] dataBuffer;
     always @(posedge clk) begin
         if (reset) begin
             state <= IDLE;
-            cmd_ready <= 1'b1;
-            cmd_done <= 1'b0;
-            cmd_error <= 1'b0;
+            cmdReady <= 1'b1;
+            cmdDone <= 1'b0;
+            cmdError <= 1'b0;
             busy <= 1'b0;
-            words_transferred <= 8'b0;
-            ext_read_valid <= 1'b0;
-            ext_read_address <= {ADDR_BITS{1'b0}};
-            ext_write_valid <= 1'b0;
-            ext_write_address <= {ADDR_BITS{1'b0}};
-            ext_write_data <= {DATA_WIDTH{1'b0}};
-            sram_read_valid <= 1'b0;
-            sram_read_address <= {SRAM_ADDR_BITS{1'b0}};
-            sram_write_valid <= 1'b0;
-            sram_write_address <= {SRAM_ADDR_BITS{1'b0}};
-            sram_write_data <= {DATA_WIDTH{1'b0}};
+            wordsTransferred <= 8'b0;
+            extReadValid <= 1'b0;
+            extReadAddress <= {ADDR_BITS{1'b0}};
+            extWriteValid <= 1'b0;
+            extWriteAddress <= {ADDR_BITS{1'b0}};
+            extWriteData <= {DATA_WIDTH{1'b0}};
+            sramReadValid <= 1'b0;
+            sramReadAddress <= {SRAM_ADDR_BITS{1'b0}};
+            sramWriteValid <= 1'b0;
+            sramWriteAddress <= {SRAM_ADDR_BITS{1'b0}};
+            sramWriteData <= {DATA_WIDTH{1'b0}};
             direction <= 1'b0;
-            ext_addr <= {ADDR_BITS{1'b0}};
-            sram_addr <= {SRAM_ADDR_BITS{1'b0}};
+            extAddr <= {ADDR_BITS{1'b0}};
+            sramAddr <= {SRAM_ADDR_BITS{1'b0}};
             remaining <= 8'b0;
-            data_buffer <= {DATA_WIDTH{1'b0}};
+            dataBuffer <= {DATA_WIDTH{1'b0}};
         end else begin
-            cmd_done <= 1'b0;
-            cmd_error <= 1'b0;
+            cmdDone <= 1'b0;
+            cmdError <= 1'b0;
             case (state)
                 IDLE: begin
                     busy <= 1'b0;
-                    cmd_ready <= 1'b1;
-                    if (cmd_valid && cmd_ready) begin
-                        direction <= cmd_direction;
-                        ext_addr <= cmd_ext_addr;
-                        sram_addr <= cmd_sram_addr;
-                        remaining <= cmd_length;
-                        words_transferred <= 8'b0;
-                        cmd_ready <= 1'b0;
+                    cmdReady <= 1'b1;
+                    if (cmdValid && cmdReady) begin
+                        direction <= cmdDirection;
+                        extAddr <= cmdExtAddr;
+                        sramAddr <= cmdSramAddr;
+                        remaining <= cmdLength;
+                        wordsTransferred <= 8'b0;
+                        cmdReady <= 1'b0;
                         busy <= 1'b1;
                         state <= LOAD_CMD;
                     end
@@ -106,24 +106,24 @@ module dma_engine #(
                     end
                 end
                 READ_EXT: begin
-                    ext_read_valid <= 1'b1;
-                    ext_read_address <= ext_addr;
-                    if (ext_read_ready) begin
-                        data_buffer <= ext_read_data;
-                        ext_read_valid <= 1'b0;
+                    extReadValid <= 1'b1;
+                    extReadAddress <= extAddr;
+                    if (extReadReady) begin
+                        dataBuffer <= extReadData;
+                        extReadValid <= 1'b0;
                         state <= WRITE_SRAM;
                     end
                 end
                 WRITE_SRAM: begin
-                    sram_write_valid <= 1'b1;
-                    sram_write_address <= sram_addr;
-                    sram_write_data <= data_buffer;
-                    if (sram_write_ready) begin
-                        sram_write_valid <= 1'b0;
-                        ext_addr <= ext_addr + 1;
-                        sram_addr <= sram_addr + 1;
+                    sramWriteValid <= 1'b1;
+                    sramWriteAddress <= sramAddr;
+                    sramWriteData <= dataBuffer;
+                    if (sramWriteReady) begin
+                        sramWriteValid <= 1'b0;
+                        extAddr <= extAddr + 1;
+                        sramAddr <= sramAddr + 1;
                         remaining <= remaining - 1;
-                        words_transferred <= words_transferred + 1;
+                        wordsTransferred <= wordsTransferred + 1;
                         if (remaining == 1) begin
                             state <= COMPLETE;
                         end else begin
@@ -132,24 +132,24 @@ module dma_engine #(
                     end
                 end
                 READ_SRAM: begin
-                    sram_read_valid <= 1'b1;
-                    sram_read_address <= sram_addr;
-                    if (sram_read_ready) begin
-                        data_buffer <= sram_read_data;
-                        sram_read_valid <= 1'b0;
+                    sramReadValid <= 1'b1;
+                    sramReadAddress <= sramAddr;
+                    if (sramReadReady) begin
+                        dataBuffer <= sramReadData;
+                        sramReadValid <= 1'b0;
                         state <= WRITE_EXT;
                     end
                 end
                 WRITE_EXT: begin
-                    ext_write_valid <= 1'b1;
-                    ext_write_address <= ext_addr;
-                    ext_write_data <= data_buffer;
-                    if (ext_write_ready) begin
-                        ext_write_valid <= 1'b0;
-                        ext_addr <= ext_addr + 1;
-                        sram_addr <= sram_addr + 1;
+                    extWriteValid <= 1'b1;
+                    extWriteAddress <= extAddr;
+                    extWriteData <= dataBuffer;
+                    if (extWriteReady) begin
+                        extWriteValid <= 1'b0;
+                        extAddr <= extAddr + 1;
+                        sramAddr <= sramAddr + 1;
                         remaining <= remaining - 1;
-                        words_transferred <= words_transferred + 1;
+                        wordsTransferred <= wordsTransferred + 1;
                         if (remaining == 1) begin
                             state <= COMPLETE;
                         end else begin
@@ -158,12 +158,12 @@ module dma_engine #(
                     end
                 end
                 COMPLETE: begin
-                    cmd_done <= 1'b1;
+                    cmdDone <= 1'b1;
                     busy <= 1'b0;
                     state <= IDLE;
                 end
                 ERROR: begin
-                    cmd_error <= 1'b1;
+                    cmdError <= 1'b1;
                     busy <= 1'b0;
                     state <= IDLE;
                 end

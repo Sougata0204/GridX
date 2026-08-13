@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module snoop_filter #(
+module snoopFilter #(
     parameter NUM_CORES = 8,
     parameter ADDR_WIDTH = 22,
     parameter FILTER_ENTRIES = 128,
@@ -12,90 +12,90 @@ module snoop_filter #(
     input  wire reset,
     
     // Query Interface
-    input  wire query_valid,
-    input  wire [ADDR_WIDTH-1:0] query_addr,
-    output reg  query_result_valid,
-    output reg  [NUM_CORES-1:0] query_core_mask,
+    input  wire queryValid,
+    input  wire [ADDR_WIDTH-1:0] queryAddr,
+    output reg  queryResultValid,
+    output reg  [NUM_CORES-1:0] queryCoreMask,
     
     // Update Interface
-    input  wire update_valid,
-    input  wire [ADDR_WIDTH-1:0] update_addr,
-    input  wire [CORE_ID_WIDTH-1:0] update_core_id,
-    input  wire update_add, // 1 = add, 0 = remove
+    input  wire updateValid,
+    input  wire [ADDR_WIDTH-1:0] updateAddr,
+    input  wire [CORE_ID_WIDTH-1:0] updateCoreId,
+    input  wire updateAdd, // 1 = add, 0 = remove
     
     // Invalidate ALL for a line
-    input  wire invalidate_valid,
-    input  wire [ADDR_WIDTH-1:0] invalidate_addr,
+    input  wire invalidateValid,
+    input  wire [ADDR_WIDTH-1:0] invalidateAddr,
     
     // Perf
-    output reg [31:0] perf_filtered_snoops
+    output reg [31:0] perfFilteredSnoops
 );
 
-    reg valid_array [FILTER_ENTRIES-1:0];
-    reg [ADDR_WIDTH-1:0] tag_array [FILTER_ENTRIES-1:0];
-    reg [NUM_CORES-1:0] presence_mask [FILTER_ENTRIES-1:0];
+    reg validArray [FILTER_ENTRIES-1:0];
+    reg [ADDR_WIDTH-1:0] tagArray [FILTER_ENTRIES-1:0];
+    reg [NUM_CORES-1:0] presenceMask [FILTER_ENTRIES-1:0];
     
     // Hash function
     // Mux priority: update > invalidate > query ensures we prioritize state updates
     // over answering new queries in the same cycle.
-    wire [$clog2(FILTER_ENTRIES)-1:0] hash_idx = update_valid ? update_addr[$clog2(FILTER_ENTRIES)-1:0] :
-                                                 invalidate_valid ? invalidate_addr[$clog2(FILTER_ENTRIES)-1:0] :
-                                                 query_addr[$clog2(FILTER_ENTRIES)-1:0];
+    wire [$clog2(FILTER_ENTRIES)-1:0] hashIdx = updateValid ? updateAddr[$clog2(FILTER_ENTRIES)-1:0] :
+                                                 invalidateValid ? invalidateAddr[$clog2(FILTER_ENTRIES)-1:0] :
+                                                 queryAddr[$clog2(FILTER_ENTRIES)-1:0];
                                                  
     integer i;
 
     always @(posedge clk) begin
         if (reset) begin
             for (i = 0; i < FILTER_ENTRIES; i = i + 1) begin
-                valid_array[i] <= 0;
-                presence_mask[i] <= 0;
+                validArray[i] <= 0;
+                presenceMask[i] <= 0;
             end
-            query_result_valid <= 0;
-            query_core_mask <= 0;
-            perf_filtered_snoops <= 0;
+            queryResultValid <= 0;
+            queryCoreMask <= 0;
+            perfFilteredSnoops <= 0;
         end else begin
-            query_result_valid <= 0;
-            query_core_mask <= 0;
+            queryResultValid <= 0;
+            queryCoreMask <= 0;
             
             // 1. Process Update
-            if (update_valid) begin
-                if (!valid_array[hash_idx] || tag_array[hash_idx] != update_addr) begin
+            if (updateValid) begin
+                if (!validArray[hashIdx] || tagArray[hashIdx] != updateAddr) begin
                     // Replace / New Entry
-                    valid_array[hash_idx] <= 1;
-                    tag_array[hash_idx] <= update_addr;
-                    presence_mask[hash_idx] <= update_add ? (1 << update_core_id) : 0;
+                    validArray[hashIdx] <= 1;
+                    tagArray[hashIdx] <= updateAddr;
+                    presenceMask[hashIdx] <= updateAdd ? (1 << updateCoreId) : 0;
                 end else begin
                     // Existing Entry
-                    if (update_add) begin
-                        presence_mask[hash_idx] <= presence_mask[hash_idx] | (1 << update_core_id);
+                    if (updateAdd) begin
+                        presenceMask[hashIdx] <= presenceMask[hashIdx] | (1 << updateCoreId);
                     end else begin
-                        presence_mask[hash_idx] <= presence_mask[hash_idx] & ~(1 << update_core_id);
-                        if ((presence_mask[hash_idx] & ~(1 << update_core_id)) == 0) begin
-                            valid_array[hash_idx] <= 0;
+                        presenceMask[hashIdx] <= presenceMask[hashIdx] & ~(1 << updateCoreId);
+                        if ((presenceMask[hashIdx] & ~(1 << updateCoreId)) == 0) begin
+                            validArray[hashIdx] <= 0;
                         end
                     end
                 end
             end
             
             // 2. Process Invalidate
-            if (invalidate_valid) begin
-                if (valid_array[hash_idx] && tag_array[hash_idx] == invalidate_addr) begin
-                    valid_array[hash_idx] <= 0;
-                    presence_mask[hash_idx] <= 0;
+            if (invalidateValid) begin
+                if (validArray[hashIdx] && tagArray[hashIdx] == invalidateAddr) begin
+                    validArray[hashIdx] <= 0;
+                    presenceMask[hashIdx] <= 0;
                 end
             end
             
             // 3. Process Query
-            if (query_valid && !update_valid && !invalidate_valid) begin
-                if (valid_array[hash_idx] && tag_array[hash_idx] == query_addr) begin
-                    query_core_mask <= presence_mask[hash_idx];
-                    if (presence_mask[hash_idx] != {NUM_CORES{1'b1}}) begin
-                        perf_filtered_snoops <= perf_filtered_snoops + 1; // Saved some snoops
+            if (queryValid && !updateValid && !invalidateValid) begin
+                if (validArray[hashIdx] && tagArray[hashIdx] == queryAddr) begin
+                    queryCoreMask <= presenceMask[hashIdx];
+                    if (presenceMask[hashIdx] != {NUM_CORES{1'b1}}) begin
+                        perfFilteredSnoops <= perfFilteredSnoops + 1; // Saved some snoops
                     end
                 end else begin
-                    query_core_mask <= {NUM_CORES{1'b1}}; // Broadcast if unsure
+                    queryCoreMask <= {NUM_CORES{1'b1}}; // Broadcast if unsure
                 end
-                query_result_valid <= 1;
+                queryResultValid <= 1;
             end
         end
     end

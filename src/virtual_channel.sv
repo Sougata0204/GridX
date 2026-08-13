@@ -2,91 +2,91 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module virtual_channel #(
+module virtualChannel #(
     parameter ADDR_WIDTH = 16,
     parameter DATA_WIDTH = 16,
     parameter FIFO_DEPTH = 4
 ) (
     input wire clk,
     input wire reset,
-    input wire in_valid,
-    input wire in_is_response,
-    input wire [ADDR_WIDTH-1:0] in_addr,
-    input wire [DATA_WIDTH-1:0] in_data,
-    input wire in_write,
-    output wire in_ready,
-    output wire vc0_valid,
-    output wire [ADDR_WIDTH-1:0] vc0_addr,
-    output wire [DATA_WIDTH-1:0] vc0_data,
-    output wire vc0_write,
-    input wire vc0_ready,
-    output wire vc1_valid,
-    output wire [ADDR_WIDTH-1:0] vc1_addr,
-    output wire [DATA_WIDTH-1:0] vc1_data,
-    input wire vc1_ready,
-    output reg [31:0] perf_vc0_packets,
-    output reg [31:0] perf_vc1_packets,
-    output reg [31:0] perf_vc0_blocked_cycles,
-    output reg [31:0] perf_vc1_blocked_cycles
+    input wire inValid,
+    input wire inIsResponse,
+    input wire [ADDR_WIDTH-1:0] inAddr,
+    input wire [DATA_WIDTH-1:0] inData,
+    input wire inWrite,
+    output wire inReady,
+    output wire vc0Valid,
+    output wire [ADDR_WIDTH-1:0] vc0Addr,
+    output wire [DATA_WIDTH-1:0] vc0Data,
+    output wire vc0Write,
+    input wire vc0Ready,
+    output wire vc1Valid,
+    output wire [ADDR_WIDTH-1:0] vc1Addr,
+    output wire [DATA_WIDTH-1:0] vc1Data,
+    input wire vc1Ready,
+    output reg [31:0] perfVc0Packets,
+    output reg [31:0] perfVc1Packets,
+    output reg [31:0] perfVc0BlockedCycles,
+    output reg [31:0] perfVc1BlockedCycles
 );
-    reg [ADDR_WIDTH+DATA_WIDTH:0] vc0_fifo [FIFO_DEPTH-1:0];
-    reg [$clog2(FIFO_DEPTH):0] vc0_count;
-    reg [$clog2(FIFO_DEPTH)-1:0] vc0_head, vc0_tail;
-    wire vc0_full = (vc0_count == FIFO_DEPTH);
-    wire vc0_empty = (vc0_count == 0);
-    assign vc0_valid = !vc0_empty;
-    assign vc0_addr = vc0_fifo[vc0_head][ADDR_WIDTH+DATA_WIDTH:DATA_WIDTH+1];
-    assign vc0_data = vc0_fifo[vc0_head][DATA_WIDTH:1];
-    assign vc0_write = vc0_fifo[vc0_head][0];
-    reg [ADDR_WIDTH+DATA_WIDTH-1:0] vc1_fifo [FIFO_DEPTH-1:0];
-    reg [$clog2(FIFO_DEPTH):0] vc1_count;
-    reg [$clog2(FIFO_DEPTH)-1:0] vc1_head, vc1_tail;
-    wire vc1_full = (vc1_count == FIFO_DEPTH);
-    wire vc1_empty = (vc1_count == 0);
-    assign vc1_valid = !vc1_empty;
-    assign vc1_addr = vc1_fifo[vc1_head][ADDR_WIDTH+DATA_WIDTH-1:DATA_WIDTH];
-    assign vc1_data = vc1_fifo[vc1_head][DATA_WIDTH-1:0];
-    assign in_ready = in_is_response ? !vc1_full : !vc0_full;
+    reg [ADDR_WIDTH+DATA_WIDTH:0] vc0Fifo [FIFO_DEPTH-1:0];
+    reg [$clog2(FIFO_DEPTH):0] vc0Count;
+    reg [$clog2(FIFO_DEPTH)-1:0] vc0Head, vc0Tail;
+    wire vc0Full = (vc0Count == FIFO_DEPTH);
+    wire vc0Empty = (vc0Count == 0);
+    assign vc0Valid = !vc0Empty;
+    assign vc0Addr = vc0Fifo[vc0Head][ADDR_WIDTH+DATA_WIDTH:DATA_WIDTH+1];
+    assign vc0Data = vc0Fifo[vc0Head][DATA_WIDTH:1];
+    assign vc0Write = vc0Fifo[vc0Head][0];
+    reg [ADDR_WIDTH+DATA_WIDTH-1:0] vc1Fifo [FIFO_DEPTH-1:0];
+    reg [$clog2(FIFO_DEPTH):0] vc1Count;
+    reg [$clog2(FIFO_DEPTH)-1:0] vc1Head, vc1Tail;
+    wire vc1Full = (vc1Count == FIFO_DEPTH);
+    wire vc1Empty = (vc1Count == 0);
+    assign vc1Valid = !vc1Empty;
+    assign vc1Addr = vc1Fifo[vc1Head][ADDR_WIDTH+DATA_WIDTH-1:DATA_WIDTH];
+    assign vc1Data = vc1Fifo[vc1Head][DATA_WIDTH-1:0];
+    assign inReady = inIsResponse ? !vc1Full : !vc0Full;
     integer i;
     always @(posedge clk) begin
         if (reset) begin
-            vc0_count <= 0;
-            vc0_head <= 0;
-            vc0_tail <= 0;
-            vc1_count <= 0;
-            vc1_head <= 0;
-            vc1_tail <= 0;
-            perf_vc0_packets <= 0;
-            perf_vc1_packets <= 0;
-            perf_vc0_blocked_cycles <= 0;
-            perf_vc1_blocked_cycles <= 0;
+            vc0Count <= 0;
+            vc0Head <= 0;
+            vc0Tail <= 0;
+            vc1Count <= 0;
+            vc1Head <= 0;
+            vc1Tail <= 0;
+            perfVc0Packets <= 0;
+            perfVc1Packets <= 0;
+            perfVc0BlockedCycles <= 0;
+            perfVc1BlockedCycles <= 0;
         end else begin
-            if (in_valid && in_ready) begin
-                if (!in_is_response) begin
-                    vc0_fifo[vc0_tail] <= {in_addr, in_data, in_write};
-                    vc0_tail <= vc0_tail + 1;
-                    vc0_count <= vc0_count + 1;
-                    perf_vc0_packets <= perf_vc0_packets + 1;
+            if (inValid && inReady) begin
+                if (!inIsResponse) begin
+                    vc0Fifo[vc0Tail] <= {inAddr, inData, inWrite};
+                    vc0Tail <= vc0Tail + 1;
+                    vc0Count <= vc0Count + 1;
+                    perfVc0Packets <= perfVc0Packets + 1;
                 end else begin
-                    vc1_fifo[vc1_tail] <= {in_addr, in_data};
-                    vc1_tail <= vc1_tail + 1;
-                    vc1_count <= vc1_count + 1;
-                    perf_vc1_packets <= perf_vc1_packets + 1;
+                    vc1Fifo[vc1Tail] <= {inAddr, inData};
+                    vc1Tail <= vc1Tail + 1;
+                    vc1Count <= vc1Count + 1;
+                    perfVc1Packets <= perfVc1Packets + 1;
                 end
             end
-            if (vc0_valid && vc0_ready) begin
-                vc0_head <= vc0_head + 1;
-                vc0_count <= vc0_count - 1;
+            if (vc0Valid && vc0Ready) begin
+                vc0Head <= vc0Head + 1;
+                vc0Count <= vc0Count - 1;
             end
-            if (vc1_valid && vc1_ready) begin
-                vc1_head <= vc1_head + 1;
-                vc1_count <= vc1_count - 1;
+            if (vc1Valid && vc1Ready) begin
+                vc1Head <= vc1Head + 1;
+                vc1Count <= vc1Count - 1;
             end
-            if (vc0_valid && !vc0_ready) begin
-                perf_vc0_blocked_cycles <= perf_vc0_blocked_cycles + 1;
+            if (vc0Valid && !vc0Ready) begin
+                perfVc0BlockedCycles <= perfVc0BlockedCycles + 1;
             end
-            if (vc1_valid && !vc1_ready) begin
-                perf_vc1_blocked_cycles <= perf_vc1_blocked_cycles + 1;
+            if (vc1Valid && !vc1Ready) begin
+                perfVc1BlockedCycles <= perfVc1BlockedCycles + 1;
             end
         end
     end

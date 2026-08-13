@@ -1,6 +1,6 @@
 // GPU Core Array & Subsystem Top
 // This module instantiates the core array, block dispatcher, and kernel state machine.
-// I wired the core active gating and core_reset_w signals to ensure cores get properly reset
+// I wired the core active gating and coreResetW signals to ensure cores get properly reset
 // between recycled thread blocks without breaking execution flow.
 `default_nettype none
 `timescale 1ns/1ns
@@ -22,125 +22,126 @@ module gpu #(
     input wire reset,
     input wire start,
     output wire done,
-    input wire device_control_write_enable,
-    input wire [15:0] device_control_data,
+    input wire deviceControlWriteEnable,
+    input wire [15:0] deviceControlData,
 
-    output wire [PROGRAM_MEM_NUM_CHANNELS-1:0] program_mem_read_valid,
-    output wire [PROGRAM_MEM_ADDR_BITS-1:0] program_mem_read_address [PROGRAM_MEM_NUM_CHANNELS-1:0],
-    input wire [PROGRAM_MEM_NUM_CHANNELS-1:0] program_mem_read_ready,
-    input wire [PROGRAM_MEM_DATA_BITS-1:0] program_mem_read_data [PROGRAM_MEM_NUM_CHANNELS-1:0],
+    output wire [PROGRAM_MEM_NUM_CHANNELS-1:0] programMemReadValid,
+    output wire [PROGRAM_MEM_ADDR_BITS-1:0] programMemReadAddress [PROGRAM_MEM_NUM_CHANNELS-1:0],
+    input wire [PROGRAM_MEM_NUM_CHANNELS-1:0] programMemReadReady,
+    input wire [PROGRAM_MEM_DATA_BITS-1:0] programMemReadData [PROGRAM_MEM_NUM_CHANNELS-1:0],
 
-    output wire [NUM_CORES-1:0] core_mem_read_valid,
-    output wire [DATA_MEM_ADDR_BITS-1:0] core_mem_read_address [NUM_CORES-1:0],
-    input  wire [NUM_CORES-1:0] core_mem_read_ready,
-    input  wire [DATA_MEM_DATA_BITS-1:0] core_mem_read_data [NUM_CORES-1:0],
+    output wire [NUM_CORES-1:0] coreMemReadValid,
+    output wire [DATA_MEM_ADDR_BITS-1:0] coreMemReadAddress [NUM_CORES-1:0],
+    input  wire [NUM_CORES-1:0] coreMemReadReady,
+    input  wire [DATA_MEM_DATA_BITS-1:0] coreMemReadData [NUM_CORES-1:0],
 
-    output wire [NUM_CORES-1:0] core_mem_write_valid,
-    output wire [DATA_MEM_ADDR_BITS-1:0] core_mem_write_address [NUM_CORES-1:0],
-    output wire [DATA_MEM_DATA_BITS-1:0] core_mem_write_data [NUM_CORES-1:0],
-    input  wire [NUM_CORES-1:0] core_mem_write_ready,
-    output wire [2:0] kernel_state_o,
+    output wire [NUM_CORES-1:0] coreMemWriteValid,
+    output wire [DATA_MEM_ADDR_BITS-1:0] coreMemWriteAddress [NUM_CORES-1:0],
+    output wire [DATA_MEM_DATA_BITS-1:0] coreMemWriteData [NUM_CORES-1:0],
+    input  wire [NUM_CORES-1:0] coreMemWriteReady,
+    input  wire [NUM_CORES-1:0] coreCreditsFull,
+    output wire [2:0] kernelStateO,
 
     // Face Controller Interfaces per Core
-    output wire [NUM_CORES-1:0][5:0] core_face_req_valid,
-    output wire [NUM_CORES-1:0][5:0] core_face_req_write,
-    output wire [NUM_CORES-1:0][5:0][DATA_MEM_ADDR_BITS-1:0] core_face_req_addr,
-    output wire [NUM_CORES-1:0][5:0][DATA_MEM_DATA_BITS-1:0] core_face_req_wdata,
-    input  wire [NUM_CORES-1:0][5:0] core_face_req_ready,
+    output wire [NUM_CORES-1:0][5:0] coreFaceReqValid,
+    output wire [NUM_CORES-1:0][5:0] coreFaceReqWrite,
+    output wire [NUM_CORES-1:0][5:0][DATA_MEM_ADDR_BITS-1:0] coreFaceReqAddr,
+    output wire [NUM_CORES-1:0][5:0][DATA_MEM_DATA_BITS-1:0] coreFaceReqWdata,
+    input  wire [NUM_CORES-1:0][5:0] coreFaceReqReady,
 
-    input  wire [NUM_CORES-1:0][5:0] core_face_resp_valid,
-    input  wire [NUM_CORES-1:0][5:0][DATA_MEM_DATA_BITS-1:0] core_face_resp_rdata,
-    output wire [NUM_CORES-1:0][5:0] core_face_resp_ready
+    input  wire [NUM_CORES-1:0][5:0] coreFaceRespValid,
+    input  wire [NUM_CORES-1:0][5:0][DATA_MEM_DATA_BITS-1:0] coreFaceRespRdata,
+    output wire [NUM_CORES-1:0][5:0] coreFaceRespReady
 );
 
-    wire [15:0] thread_count;
-    wire dcr_valid;
-    wire [2:0] kernel_state;
-    wire kernel_running;
-    wire kernel_draining;
-    wire kernel_fault;
-    wire kernel_preempting;
-    wire allow_dispatch_gate;
-    wire [15:0] blocks_dispatched;
-    wire [15:0] blocks_done_count;
-    wire [15:0] total_blocks;
-    wire all_blocks_dispatched;
-    wire all_blocks_done;
-    wire [6:0] outstanding_mem;
-    wire [4:0] outstanding_pmem;
-    wire [3:0] tensor_inflight = 4'b0000;  // No tensor pipeline tracking - default to idle (4-bit clean)
-    wire instr_retired;
-    wire mem_response;
-    wire tensor_complete;
-    wire [NUM_CORES-1:0] core_start;
-    wire [NUM_CORES-1:0] core_reset_w;
-    wire [NUM_CORES-1:0] core_done;
-    wire [7:0] core_block_id [NUM_CORES-1:0];
-    wire [$clog2(THREADS_PER_BLOCK):0] core_thread_count [NUM_CORES-1:0];
-    wire [NUM_CORES-1:0] core_instr_retired;
-    wire [NUM_CORES-1:0] core_perf_smem_access;
-    wire [NUM_CORES-1:0] core_perf_smem_conflict;
-    wire [NUM_CORES-1:0] core_perf_ext_access;
-    wire [NUM_CORES-1:0] core_perf_alu_active;
-    wire [NUM_CORES-1:0] core_perf_alu_idle;
-    wire [NUM_CORES-1:0] core_perf_tensor_active;
-    wire [NUM_CORES-1:0] core_perf_tensor_idle;
-    wire [NUM_CORES-1:0] core_perf_stall_mem;
-    wire [NUM_CORES-1:0] core_perf_stall_shared;
-    wire [NUM_CORES-1:0] core_perf_stall_tensor;
-    wire [NUM_CORES-1:0] core_perf_stall_dep;
-    wire [NUM_CORES-1:0] core_perf_stall_ready;
-    wire [NUM_CORES-1:0] core_perf_store_combined;
-    wire [NUM_CORES-1:0] core_perf_early_wakeup;
-    wire [NUM_CORES-1:0] core_perf_dual_issue_attempt;
-    wire [NUM_CORES-1:0] core_perf_dual_issue_success;
-    assign instr_retired = |core_instr_retired;
-    assign mem_response = |core_mem_read_ready | |core_mem_write_ready;
-    assign kernel_state_o = kernel_state;
+    wire [15:0] threadCount;
+    wire dcrValid;
+    wire [2:0] kernelState;
+    wire kernelRunning;
+    wire kernelDraining;
+    wire kernelFault;
+    wire kernelPreempting;
+    wire allowDispatchGate;
+    wire [15:0] blocksDispatched;
+    wire [15:0] blocksDoneCount;
+    wire [15:0] totalBlocks;
+    wire allBlocksDispatched;
+    wire allBlocksDone;
+    wire [6:0] outstandingMem;
+    wire [4:0] outstandingPmem;
+    wire [3:0] tensorInflight = 4'b0000;  // No tensor pipeline tracking - default to idle (4-bit clean)
+    wire instrRetired;
+    wire memResponse;
+    wire tensorComplete;
+    wire [NUM_CORES-1:0] coreStart;
+    wire [NUM_CORES-1:0] coreResetW;
+    wire [NUM_CORES-1:0] coreDone;
+    wire [7:0] coreBlockId [NUM_CORES-1:0];
+    wire [$clog2(THREADS_PER_BLOCK):0] coreThreadCount [NUM_CORES-1:0];
+    wire [NUM_CORES-1:0] coreInstrRetired;
+    wire [NUM_CORES-1:0] corePerfSmemAccess;
+    wire [NUM_CORES-1:0] corePerfSmemConflict;
+    wire [NUM_CORES-1:0] corePerfExtAccess;
+    wire [NUM_CORES-1:0] corePerfAluActive;
+    wire [NUM_CORES-1:0] corePerfAluIdle;
+    wire [NUM_CORES-1:0] corePerfTensorActive;
+    wire [NUM_CORES-1:0] corePerfTensorIdle;
+    wire [NUM_CORES-1:0] corePerfStallMem;
+    wire [NUM_CORES-1:0] corePerfStallShared;
+    wire [NUM_CORES-1:0] corePerfStallTensor;
+    wire [NUM_CORES-1:0] corePerfStallDep;
+    wire [NUM_CORES-1:0] corePerfStallReady;
+    wire [NUM_CORES-1:0] corePerfStoreCombined;
+    wire [NUM_CORES-1:0] corePerfEarlyWakeup;
+    wire [NUM_CORES-1:0] corePerfDualIssueAttempt;
+    wire [NUM_CORES-1:0] corePerfDualIssueSuccess;
+    assign instrRetired = |coreInstrRetired;
+    assign memResponse = |coreMemReadReady | |coreMemWriteReady;
+    assign kernelStateO = kernelState;
 
-    wire gc6_context_save_req;
-    wire gc6_context_restore_req;
-    wire gc6_power_gate;
-    wire gc6_clock_gate;
-    wire [2:0] gc6_state;
-    wire gc6_watchdog_fault;
-    wire gc6_active;
-    wire gc6_powered_off;
-    wire kernel_context_save_trigger;
+    wire gc6ContextSaveReq;
+    wire gc6ContextRestoreReq;
+    wire gc6PowerGate;
+    wire gc6ClockGate;
+    wire [2:0] gc6State;
+    wire gc6WatchdogFault;
+    wire gc6Active;
+    wire gc6PoweredOff;
+    wire kernelContextSaveTrigger;
 
-    wire fault_interrupt;
-    wire fault_kill_kernel;
-    wire ch_all_idle;
-    wire perf_clock_enable;
-    wire [1:0] perf_level;
+    wire faultInterrupt;
+    wire faultKillKernel;
+    wire chAllIdle;
+    wire perfClockEnable;
+    wire [1:0] perfLevel;
 
     localparam NUM_FETCHERS = NUM_CORES;
-    wire [NUM_FETCHERS-1:0] fetcher_read_valid;
-    wire [PROGRAM_MEM_ADDR_BITS-1:0] fetcher_read_address [NUM_FETCHERS-1:0];
-    wire [NUM_FETCHERS-1:0] fetcher_read_ready;
-    wire [PROGRAM_MEM_DATA_BITS-1:0] fetcher_read_data [NUM_FETCHERS-1:0];
+    wire [NUM_FETCHERS-1:0] fetcherReadValid;
+    wire [PROGRAM_MEM_ADDR_BITS-1:0] fetcherReadAddress [NUM_FETCHERS-1:0];
+    wire [NUM_FETCHERS-1:0] fetcherReadReady;
+    wire [PROGRAM_MEM_DATA_BITS-1:0] fetcherReadData [NUM_FETCHERS-1:0];
 
-    dcr dcr_instance (
+    dcr dcrInstance (
         .clk(clk),
         .reset(reset),
-        .device_control_write_enable(device_control_write_enable),
-        .device_control_data(device_control_data),
-        .thread_count(thread_count),
-        .dcr_valid(dcr_valid)
+        .deviceControlWriteEnable(deviceControlWriteEnable),
+        .deviceControlData(deviceControlData),
+        .threadCount(threadCount),
+        .dcrValid(dcrValid)
     );
 
-    reg [6:0] outstanding_mem_reg;
+    reg [6:0] outstandingMemReg;
     always @(posedge clk or posedge reset) begin
-        if (reset) outstanding_mem_reg <= 7'd0;
+        if (reset) outstandingMemReg <= 7'd0;
         else begin
-            outstanding_mem_reg <= outstanding_mem_reg
-                + (|core_mem_read_valid  ? 1'd1 : 1'd0)
-                - (|core_mem_read_ready  ? 1'd1 : 1'd0)
-                + (|core_mem_write_valid ? 1'd1 : 1'd0)
-                - (|core_mem_write_ready ? 1'd1 : 1'd0);
+            outstandingMemReg <= outstandingMemReg
+                + (|coreMemReadValid  ? 1'd1 : 1'd0)
+                - (|coreMemReadReady  ? 1'd1 : 1'd0)
+                + (|coreMemWriteValid ? 1'd1 : 1'd0)
+                - (|coreMemWriteReady ? 1'd1 : 1'd0);
         end
     end
-    assign outstanding_mem = outstanding_mem_reg;
+    assign outstandingMem = outstandingMemReg;
 
     controller #(
         .ADDR_BITS(PROGRAM_MEM_ADDR_BITS),
@@ -148,170 +149,170 @@ module gpu #(
         .NUM_CONSUMERS(NUM_FETCHERS),
         .NUM_CHANNELS(PROGRAM_MEM_NUM_CHANNELS),
         .WRITE_ENABLE(0)
-    ) program_memory_controller (
+    ) programMemoryController (
         .clk(clk),
         .reset(reset),
-        .consumer_read_valid(fetcher_read_valid),
-        .consumer_read_address(fetcher_read_address),
-        .consumer_read_ready(fetcher_read_ready),
-        .consumer_read_data(fetcher_read_data),
-        .mem_read_valid(program_mem_read_valid),
-        .mem_read_address(program_mem_read_address),
-        .mem_read_ready(program_mem_read_ready),
-        .mem_read_data(program_mem_read_data),
-        .pending_transactions(outstanding_pmem)
+        .consumerReadValid(fetcherReadValid),
+        .consumerReadAddress(fetcherReadAddress),
+        .consumerReadReady(fetcherReadReady),
+        .consumerReadData(fetcherReadData),
+        .memReadValid(programMemReadValid),
+        .memReadAddress(programMemReadAddress),
+        .memReadReady(programMemReadReady),
+        .memReadData(programMemReadData),
+        .pendingTransactions(outstandingPmem)
     );
 
-    kernel_fsm #(
+    kernelFsm #(
         .NUM_CORES(NUM_CORES),
         .WARPS_PER_CORE(WARPS_PER_CORE),
-        .WATCHDOG_THRESHOLD(8192),
+        .WATCHDOG_THRESHOLD(200000),
         .MAX_DRAIN_CYCLES(4096)
-    ) kernel_control (
+    ) kernelControl (
         .clk(clk),
         .reset(reset),
         .start(start),
-        .dcr_valid(dcr_valid),
-        .thread_count(thread_count),
-        .all_blocks_dispatched(all_blocks_dispatched),
-        .all_blocks_done(all_blocks_done),
-        .blocks_dispatched(blocks_dispatched),
-        .total_blocks(total_blocks),
-        .core_done(core_done),
-        .outstanding_mem(outstanding_mem),
-        .tensor_inflight(tensor_inflight),
-        .instr_retired(instr_retired),
-        .mem_response(mem_response),
-        .tensor_complete(1'b0),
-        .force_preempt(1'b0),
-        .gc6_sleep_req(gc6_context_save_req),
-        .context_save_trigger(kernel_context_save_trigger),
-        .fault_kill(fault_kill_kernel),
-        .dcr_watchdog_thresh(32'd0),
-        .kernel_state(kernel_state),
-        .kernel_done(done),
-        .kernel_running(kernel_running),
-        .kernel_draining(kernel_draining),
-        .kernel_fault(kernel_fault),
-        .kernel_preempting(kernel_preempting),
-        .allow_dispatch(allow_dispatch_gate),
-        .allow_fetch(),
-        .allow_issue(),
-        .allow_memory(),
-        .allow_tensor(),
-        .allow_writeback()
+        .dcrValid(dcrValid),
+        .threadCount(threadCount),
+        .allBlocksDispatched(allBlocksDispatched),
+        .allBlocksDone(allBlocksDone),
+        .blocksDispatched(blocksDispatched),
+        .totalBlocks(totalBlocks),
+        .coreDone(coreDone),
+        .outstandingMem(outstandingMem),
+        .tensorInflight(tensorInflight),
+        .instrRetired(instrRetired),
+        .memResponse(memResponse),
+        .tensorComplete(1'b0),
+        .forcePreempt(1'b0),
+        .gc6SleepReq(gc6ContextSaveReq),
+        .contextSaveTrigger(kernelContextSaveTrigger),
+        .faultKill(faultKillKernel),
+        .dcrWatchdogThresh(32'd0),
+        .kernelState(kernelState),
+        .kernelDone(done),
+        .kernelRunning(kernelRunning),
+        .kernelDraining(kernelDraining),
+        .kernelFault(kernelFault),
+        .kernelPreempting(kernelPreempting),
+        .allowDispatch(allowDispatchGate),
+        .allowFetch(),
+        .allowIssue(),
+        .allowMemory(),
+        .allowTensor(),
+        .allowWriteback()
     );
 
-    gc6_power_fsm #(
-        .DRAIN_TIMEOUT(2048),
+    gc6PowerFsm #(
+        .drainTimeout(2048),
         .WAKE_TIMEOUT(1024),
         .RESTORE_TIMEOUT(512)
-    ) gc6_ctrl (
+    ) gc6Ctrl (
         .clk(clk),
-        .rst_n(!reset),
-        .dcr_enter_req_i(1'b0),
-        .dcr_exit_req_i(1'b0),
-        .dcr_retention_i(1'b1),
-        .dcr_watchdog_thresh_i(32'd0),
-        .all_pipelines_empty_i(1'b1),
-        .outstanding_mem_i(outstanding_mem),
-        .tensor_inflight_i(tensor_inflight),
-        .context_save_req_o(gc6_context_save_req),
-        .context_save_ack_i(kernel_context_save_trigger),
-        .context_restore_req_o(gc6_context_restore_req),
-        .context_restore_ack_i(1'b0),
-        .pll_lock_i(1'b1),
-        .power_gate_enable_o(gc6_power_gate),
-        .clock_gate_enable_o(gc6_clock_gate),
-        .retention_enable_o(),
-        .gc6_state_o(gc6_state),
-        .gc6_watchdog_fault_o(gc6_watchdog_fault),
-        .gc6_active_o(gc6_active),
-        .gc6_powered_off_o(gc6_powered_off)
+        .rstN(!reset),
+        .dcrEnterReqI(1'b0),
+        .dcrExitReqI(1'b0),
+        .dcrRetentionI(1'b1),
+        .dcrWatchdogThreshI(32'd0),
+        .allPipelinesEmptyI(1'b1),
+        .outstandingMemI(outstandingMem),
+        .tensorInflightI(tensorInflight),
+        .contextSaveReqO(gc6ContextSaveReq),
+        .contextSaveAckI(kernelContextSaveTrigger),
+        .contextRestoreReqO(gc6ContextRestoreReq),
+        .contextRestoreAckI(1'b0),
+        .pllLockI(1'b1),
+        .powerGateEnableO(gc6PowerGate),
+        .clockGateEnableO(gc6ClockGate),
+        .retentionEnableO(),
+        .gc6StateO(gc6State),
+        .gc6WatchdogFaultO(gc6WatchdogFault),
+        .gc6ActiveO(gc6Active),
+        .gc6PoweredOffO(gc6PoweredOff)
     );
 
-    fault_handler #(
+    faultHandler #(
         .FIFO_DEPTH(16),
         .ADDR_WIDTH(32)
-    ) fault_ctrl (
+    ) faultCtrl (
         .clk(clk),
-        .rst_n(!reset),
-        .fault_valid_i(1'b0),
-        .fault_addr_i(32'h0),
-        .fault_type_i(2'h0),
-        .fault_warp_id_i(5'h0),
-        .fault_core_id_i(4'h0),
-        .fault_thread_mask_i(6'h0),
-        .dcr_fault_mode_i(2'h0),
-        .dcr_fault_clear_i(1'b0),
-        .fault_interrupt_o(fault_interrupt),
-        .fault_kill_kernel_o(fault_kill_kernel),
-        .fault_mask_thread_o(),
-        .dcr_fault_head_o(),
-        .dcr_fault_head_meta_o(),
-        .dcr_fault_drop_count_o(),
-        .dcr_fault_fifo_depth_o(),
-        .fifo_empty_o(),
-        .fifo_full_o()
+        .rstN(!reset),
+        .faultValidI(1'b0),
+        .faultAddrI(32'h0),
+        .faultTypeI(2'h0),
+        .faultWarpIdI(5'h0),
+        .faultCoreIdI(4'h0),
+        .faultThreadMaskI(6'h0),
+        .dcrFaultModeI(2'h0),
+        .dcrFaultClearI(1'b0),
+        .faultInterruptO(faultInterrupt),
+        .faultKillKernelO(faultKillKernel),
+        .faultMaskThreadO(),
+        .dcrFaultHeadO(),
+        .dcrFaultHeadMetaO(),
+        .dcrFaultDropCountO(),
+        .dcrFaultFifoDepthO(),
+        .fifoEmptyO(),
+        .fifoFullO()
     );
 
-    channel_scheduler #(
+    channelScheduler #(
         .NUM_CHANNELS(8)
-    ) ch_sched (
+    ) chSched (
         .clk(clk),
-        .rst_n(!reset),
-        .ch_runnable_i(8'h01),
-        .ch_priority_i(16'h0),
-        .ch_block_done_i(8'h0),
-        .dcr_timeslice_p0_i(32'd256),
-        .dcr_timeslice_p1_i(32'd512),
-        .dcr_timeslice_p2_i(32'd1024),
-        .dcr_timeslice_p3_i(32'd2048),
-        .dcr_aging_thresh_i(32'd4096),
-        .ch_running_o(),
-        .ch_state_o(),
-        .ch_preempt_o(),
-        .ch_aged_promotion_o(),
-        .all_channels_idle_o(ch_all_idle),
-        .active_channel_o()
+        .rstN(!reset),
+        .chRunnableI(8'h01),
+        .chPriorityI(16'h0),
+        .chBlockDoneI(8'h0),
+        .dcrTimesliceP0I(32'd256),
+        .dcrTimesliceP1I(32'd512),
+        .dcrTimesliceP2I(32'd1024),
+        .dcrTimesliceP3I(32'd2048),
+        .dcrAgingThreshI(32'd4096),
+        .chRunningO(),
+        .chStateO(),
+        .chPreemptO(),
+        .chAgedPromotionO(),
+        .allChannelsIdleO(chAllIdle),
+        .activeChannelO()
     );
 
-    perf_boost_controller perf_ctrl (
+    perfBoostController perfCtrl (
         .clk(clk),
-        .rst_n(!reset),
-        .alu_active_pulse_i(|core_perf_alu_active),
-        .tensor_active_pulse_i(|core_perf_tensor_active),
-        .kernel_active_i(kernel_running),
-        .dcr_force_level_i(2'd0),
-        .dcr_force_en_i(1'b0),
-        .dcr_up_thresh_i(8'd75),
-        .dcr_down_thresh_i(8'd25),
-        .dcr_sample_win_i(32'd1024),
-        .perf_level_o(perf_level),
-        .clock_enable_o(perf_clock_enable),
-        .total_active_cycles_o(),
-        .total_sample_cycles_o()
+        .rstN(!reset),
+        .aluActivePulseI(|corePerfAluActive),
+        .tensorActivePulseI(|corePerfTensorActive),
+        .kernelActiveI(kernelRunning),
+        .dcrForceLevelI(2'd0),
+        .dcrForceEnI(1'b0),
+        .dcrUpThreshI(8'd75),
+        .dcrDownThreshI(8'd25),
+        .dcrSampleWinI(32'd1024),
+        .perfLevelO(perfLevel),
+        .clockEnableO(perfClockEnable),
+        .totalActiveCyclesO(),
+        .totalSampleCyclesO()
     );
 
     dispatch #(
         .NUM_CORES(NUM_CORES),
         .THREADS_PER_BLOCK(THREADS_PER_BLOCK)
-    ) dispatch_instance (
+    ) dispatchInstance (
         .clk(clk),
         .reset(reset),
         .start(start),
-        .kernel_running(allow_dispatch_gate),
-        .thread_count(thread_count),
-        .core_done(core_done),
-        .core_start(core_start),
-        .core_reset(core_reset_w),
-        .core_block_id(core_block_id),
-        .core_thread_count(core_thread_count),
-        .blocks_dispatched_out(blocks_dispatched),
-        .blocks_done_out(blocks_done_count),
-        .total_blocks_out(total_blocks),
-        .all_blocks_dispatched(all_blocks_dispatched),
-        .all_blocks_done      (all_blocks_done)
+        .kernelRunning(allowDispatchGate),
+        .threadCount(threadCount),
+        .coreDone(coreDone),
+        .coreStart(coreStart),
+        .coreReset(coreResetW),
+        .coreBlockId(coreBlockId),
+        .coreThreadCount(coreThreadCount),
+        .blocksDispatchedOut(blocksDispatched),
+        .blocksDoneOut(blocksDoneCount),
+        .totalBlocksOut(totalBlocks),
+        .allBlocksDispatched(allBlocksDispatched),
+        .allBlocksDone      (allBlocksDone)
     );
 
     genvar i;
@@ -324,104 +325,105 @@ module gpu #(
                 .PROGRAM_MEM_DATA_BITS(PROGRAM_MEM_DATA_BITS),
                 .THREADS_PER_BLOCK(THREADS_PER_BLOCK),
                 .WARPS_PER_CORE(WARPS_PER_CORE)
-            ) core_instance (
+            ) coreInstance (
                 .clk(clk),
-                .reset(core_reset_w[i]),
-                .start(core_start[i]),
-                .kernel_running(kernel_running),
-                .done(core_done[i]),
-                .instr_retired(core_instr_retired[i]),
-                .block_id(core_block_id[i]),
-                .thread_count(core_thread_count[i]),
-                .program_mem_read_valid(fetcher_read_valid[i]),
-                .program_mem_read_address(fetcher_read_address[i]),
-                .program_mem_read_ready(fetcher_read_ready[i]),
-                .program_mem_read_data(fetcher_read_data[i]),
-                .mem_read_valid(core_mem_read_valid[i]),
-                .mem_read_address(core_mem_read_address[i]),
-                .mem_read_ready(core_mem_read_ready[i]),
-                .mem_read_data(core_mem_read_data[i]),
-                .mem_write_valid(core_mem_write_valid[i]),
-                .mem_write_address(core_mem_write_address[i]),
-                .mem_write_data(core_mem_write_data[i]),
-                .mem_write_ready(core_mem_write_ready[i]),
-                .perf_shared_mem_access(core_perf_smem_access[i]),
-                .perf_shared_mem_conflict(core_perf_smem_conflict[i]),
-                .perf_external_mem_access(core_perf_ext_access[i]),
-                .perf_alu_active(core_perf_alu_active[i]),
-                .perf_alu_idle(core_perf_alu_idle[i]),
-                .perf_tensor_active(core_perf_tensor_active[i]),
-                .perf_tensor_idle(core_perf_tensor_idle[i]),
-                .perf_stall_mem(core_perf_stall_mem[i]),
-                .perf_stall_shared(core_perf_stall_shared[i]),
-                .perf_stall_tensor(core_perf_stall_tensor[i]),
-                .perf_stall_dep(core_perf_stall_dep[i]),
-                .perf_stall_ready(core_perf_stall_ready[i]),
-                .perf_store_combined(core_perf_store_combined[i]),
-                .perf_early_wakeup(core_perf_early_wakeup[i]),
-                .perf_dual_issue_attempt(core_perf_dual_issue_attempt[i]),
-                .perf_dual_issue_success(core_perf_dual_issue_success[i]),
+                .reset(coreResetW[i]),
+                .start(coreStart[i]),
+                .kernelRunning(kernelRunning),
+                .done(coreDone[i]),
+                .instrRetired(coreInstrRetired[i]),
+                .blockId(coreBlockId[i]),
+                .threadCount(coreThreadCount[i]),
+                .programMemReadValid(fetcherReadValid[i]),
+                .programMemReadAddress(fetcherReadAddress[i]),
+                .programMemReadReady(fetcherReadReady[i]),
+                .programMemReadData(fetcherReadData[i]),
+                .memReadValid(coreMemReadValid[i]),
+                .memReadAddress(coreMemReadAddress[i]),
+                .memReadReady(coreMemReadReady[i]),
+                .memReadData(coreMemReadData[i]),
+                .memWriteValid(coreMemWriteValid[i]),
+                .memWriteAddress(coreMemWriteAddress[i]),
+                .memWriteData(coreMemWriteData[i]),
+                .memWriteReady(coreMemWriteReady[i]),
+                .nocCreditsFull(coreCreditsFull[i]),
+                .perfSharedMemAccess(corePerfSmemAccess[i]),
+                .perfSharedMemConflict(corePerfSmemConflict[i]),
+                .perfExternalMemAccess(corePerfExtAccess[i]),
+                .perfAluActive(corePerfAluActive[i]),
+                .perfAluIdle(corePerfAluIdle[i]),
+                .perfTensorActive(corePerfTensorActive[i]),
+                .perfTensorIdle(corePerfTensorIdle[i]),
+                .perfStallMem(corePerfStallMem[i]),
+                .perfStallShared(corePerfStallShared[i]),
+                .perfStallTensor(corePerfStallTensor[i]),
+                .perfStallDep(corePerfStallDep[i]),
+                .perfStallReady(corePerfStallReady[i]),
+                .perfStoreCombined(corePerfStoreCombined[i]),
+                .perfEarlyWakeup(corePerfEarlyWakeup[i]),
+                .perfDualIssueAttempt(corePerfDualIssueAttempt[i]),
+                .perfDualIssueSuccess(corePerfDualIssueSuccess[i]),
                 
                 // Face Controller Interfaces
-                .face_req_valid(core_face_req_valid[i]),
-                .face_req_write(core_face_req_write[i]),
-                .face_req_addr(core_face_req_addr[i]),
-                .face_req_wdata(core_face_req_wdata[i]),
-                .face_req_ready(core_face_req_ready[i]),
-                .face_resp_valid(core_face_resp_valid[i]),
-                .face_resp_rdata(core_face_resp_rdata[i]),
-                .face_resp_ready(core_face_resp_ready[i])
+                .faceReqValid(coreFaceReqValid[i]),
+                .faceReqWrite(coreFaceReqWrite[i]),
+                .faceReqAddr(coreFaceReqAddr[i]),
+                .faceReqWdata(coreFaceReqWdata[i]),
+                .faceReqReady(coreFaceReqReady[i]),
+                .faceRespValid(coreFaceRespValid[i]),
+                .faceRespRdata(coreFaceRespRdata[i]),
+                .faceRespReady(coreFaceRespReady[i])
             );
         end
     endgenerate
 
-    kernel_perf_model perf_model (
+    kernelPerfModel perfModel (
         .clk(clk),
         .reset(reset),
-        .kernel_active(kernel_running),
-        .alu_active_pulse(|core_perf_alu_active),
-        .alu_idle_pulse(|core_perf_alu_idle),
-        .tensor_active_pulse(|core_perf_tensor_active),
-        .tensor_idle_pulse(|core_perf_tensor_idle),
-        .dual_issue_attempt_pulse(|core_perf_dual_issue_attempt),
-        .dual_issue_success_pulse(|core_perf_dual_issue_success),
-        .stall_mem_pulse(|core_perf_stall_mem),
-        .stall_shared_pulse(|core_perf_stall_shared),
-        .stall_tensor_pulse(|core_perf_stall_tensor),
-        .stall_dep_pulse(|core_perf_stall_dep),
-        .stall_ready_pulse(|core_perf_stall_ready),
-        .store_combined_pulse(|core_perf_store_combined),
-        .store_flush_pulse(1'b0),
-        .early_wakeup_pulse(|core_perf_early_wakeup)
+        .kernelActive(kernelRunning),
+        .aluActivePulse(|corePerfAluActive),
+        .aluIdlePulse(|corePerfAluIdle),
+        .tensorActivePulse(|corePerfTensorActive),
+        .tensorIdlePulse(|corePerfTensorIdle),
+        .dualIssueAttemptPulse(|corePerfDualIssueAttempt),
+        .dualIssueSuccessPulse(|corePerfDualIssueSuccess),
+        .stallMemPulse(|corePerfStallMem),
+        .stallSharedPulse(|corePerfStallShared),
+        .stallTensorPulse(|corePerfStallTensor),
+        .stallDepPulse(|corePerfStallDep),
+        .stallReadyPulse(|corePerfStallReady),
+        .storeCombinedPulse(|corePerfStoreCombined),
+        .storeFlushPulse(1'b0),
+        .earlyWakeupPulse(|corePerfEarlyWakeup)
     );
 
-    performance_counters #(
+    performanceCounters #(
         .NUM_CORES(NUM_CORES),
         .WARPS_PER_CORE(WARPS_PER_CORE)
-    ) global_perf (
+    ) globalPerf (
         .clk(clk),
         .reset(reset),
         .enable(1'b1),
         .clear(1'b0),
-        .core_active({NUM_CORES{kernel_running}}),
-        .core_stalled(core_perf_stall_mem | core_perf_stall_tensor),
-        .instr_issued(core_instr_retired),
-        .instr_retired(core_instr_retired),
-        .l1_read_hit({NUM_CORES{1'b0}}),
-        .l1_write_hit({NUM_CORES{1'b0}}),
-        .l2_read_hit({NUM_CORES{1'b0}}),
-        .l2_write_hit({NUM_CORES{1'b0}}),
-        .shared_mem_hit(core_perf_smem_access),
-        .shared_mem_conflict(core_perf_smem_conflict),
-        .external_mem_access(core_perf_ext_access),
-        .l3_access({NUM_CORES{1'b0}}),
-        .stall_mem(core_perf_stall_mem),
-        .stall_tensor(core_perf_stall_tensor),
-        .stall_reg_hazard(core_perf_stall_dep),
-        .stall_structural({NUM_CORES{1'b0}}),
-        .tensor_op_start(core_perf_tensor_active),
-        .tensor_op_complete(core_perf_tensor_idle),
-        .core_clock_gated({NUM_CORES{1'b0}}),
-        .core_power_gated({NUM_CORES{1'b0}})
+        .coreActive({NUM_CORES{kernelRunning}}),
+        .coreStalled(corePerfStallMem | corePerfStallTensor),
+        .instrIssued(coreInstrRetired),
+        .instrRetired(coreInstrRetired),
+        .l1ReadHit({NUM_CORES{1'b0}}),
+        .l1WriteHit({NUM_CORES{1'b0}}),
+        .l2ReadHit({NUM_CORES{1'b0}}),
+        .l2WriteHit({NUM_CORES{1'b0}}),
+        .sharedMemHit(corePerfSmemAccess),
+        .sharedMemConflict(corePerfSmemConflict),
+        .externalMemAccess(corePerfExtAccess),
+        .l3Access({NUM_CORES{1'b0}}),
+        .stallMem(corePerfStallMem),
+        .stallTensor(corePerfStallTensor),
+        .stallRegHazard(corePerfStallDep),
+        .stallStructural({NUM_CORES{1'b0}}),
+        .tensorOpStart(corePerfTensorActive),
+        .tensorOpComplete(corePerfTensorIdle),
+        .coreClockGated({NUM_CORES{1'b0}}),
+        .corePowerGated({NUM_CORES{1'b0}})
     );
 endmodule

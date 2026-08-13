@@ -16,7 +16,6 @@ if {$argc > 0 && [lindex $argv 0] ne ""} {
 
 file mkdir $OUTPUT_DIR
 
-# ---- Source files ----
 set SRC_DIR      [file join $PROJECT_ROOT src]
 set MESH_DIR     [file join $PROJECT_ROOT memory_mesh src]
 
@@ -98,7 +97,6 @@ set SRC_FILES [list \
     $SRC_DIR/gridx_kernel_top.sv \
 ]
 
-# ---- Read Sources ----
 puts " GridX³ Kernel — Vivado Batch Build"
 puts " Top: $TOP_MODULE"
 puts " Part: $PART"
@@ -106,7 +104,6 @@ puts " Part: $PART"
 read_verilog -sv $SRC_FILES
 read_xdc [file join $PROJECT_ROOT constraints gridx_kernel_top.xdc]
 
-# ---- Synthesis ----
 puts "\n>>> Running Synthesis..."
 synth_design -top $TOP_MODULE -part $PART \
     -flatten_hierarchy rebuilt \
@@ -115,7 +112,6 @@ write_checkpoint -force $OUTPUT_DIR/post_synth.dcp
 report_utilization -file $OUTPUT_DIR/synth_utilization.rpt
 report_timing_summary -file $OUTPUT_DIR/synth_timing.rpt
 
-# ---- Implementation ----
 puts "\n>>> Running Optimization..."
 opt_design -directive ExploreWithRemap
 
@@ -131,7 +127,6 @@ report_timing_summary -file $OUTPUT_DIR/route_timing.rpt
 report_utilization -file $OUTPUT_DIR/route_utilization.rpt
 report_power -file $OUTPUT_DIR/power.rpt
 
-# ---- Generate Bitstream ----
 puts "\n>>> Generating Bitstream..."
 write_bitstream -force $OUTPUT_DIR/${TOP_MODULE}.bit
 

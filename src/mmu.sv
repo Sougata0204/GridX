@@ -15,41 +15,41 @@ module mmu #(
     input  wire reset,
     
     // Core Interface
-    input  wire translate_valid,
-    input  wire [VIRTUAL_ADDR_BITS-1:0] translate_vaddr,
-    input  wire [ASID_BITS-1:0] translate_asid,
-    input  wire translate_write,
-    output reg  translate_ready,
-    output reg  [PHYSICAL_ADDR_BITS-1:0] translate_paddr,
-    output reg  translate_fault,
+    input  wire translateValid,
+    input  wire [VIRTUAL_ADDR_BITS-1:0] translateVaddr,
+    input  wire [ASID_BITS-1:0] translateAsid,
+    input  wire translateWrite,
+    output reg  translateReady,
+    output reg  [PHYSICAL_ADDR_BITS-1:0] translatePaddr,
+    output reg  translateFault,
     
     // Memory Interface (for Page Table Walker)
-    output wire ptw_mem_read_valid,
-    output wire [PHYSICAL_ADDR_BITS-1:0] ptw_mem_read_addr,
-    input  wire ptw_mem_read_ready,
-    input  wire [63:0] ptw_mem_read_data,
+    output wire ptwMemReadValid,
+    output wire [PHYSICAL_ADDR_BITS-1:0] ptwMemReadAddr,
+    input  wire ptwMemReadReady,
+    input  wire [63:0] ptwMemReadData,
     
     // System Config
-    input  wire [PHYSICAL_ADDR_BITS-1:0] page_table_base,
-    input  wire tlb_invalidate_all,
+    input  wire [PHYSICAL_ADDR_BITS-1:0] pageTableBase,
+    input  wire tlbInvalidateAll,
     
     // Performance
-    output reg  [31:0] perf_tlb_hits,
-    output reg  [31:0] perf_tlb_misses,
-    output reg  [31:0] perf_page_faults
+    output reg  [31:0] perfTlbHits,
+    output reg  [31:0] perfTlbMisses,
+    output reg  [31:0] perfPageFaults
 );
 
     // TLB Signals
-    wire tlb_lookup_hit;
-    wire [PHYSICAL_ADDR_BITS-1:0] tlb_lookup_paddr;
-    wire [2:0] tlb_lookup_permissions;
-    reg tlb_lookup_valid;
+    wire tlbLookupHit;
+    wire [PHYSICAL_ADDR_BITS-1:0] tlbLookupPaddr;
+    wire [2:0] tlbLookupPermissions;
+    reg tlbLookupValid;
     
-    reg tlb_write_valid;
-    reg [VIRTUAL_ADDR_BITS-1:0] tlb_write_vaddr;
-    reg [PHYSICAL_ADDR_BITS-1:0] tlb_write_paddr;
-    reg [ASID_BITS-1:0] tlb_write_asid;
-    reg [2:0] tlb_write_permissions;
+    reg tlbWriteValid;
+    reg [VIRTUAL_ADDR_BITS-1:0] tlbWriteVaddr;
+    reg [PHYSICAL_ADDR_BITS-1:0] tlbWritePaddr;
+    reg [ASID_BITS-1:0] tlbWriteAsid;
+    reg [2:0] tlbWritePermissions;
     
     tlb #(
         .NUM_ENTRIES(TLB_ENTRIES),
@@ -57,138 +57,138 @@ module mmu #(
         .PHYSICAL_ADDR_BITS(PHYSICAL_ADDR_BITS),
         .PAGE_OFFSET_BITS(PAGE_OFFSET_BITS),
         .ASID_BITS(ASID_BITS)
-    ) u_tlb (
+    ) uTlb (
         .clk(clk),
         .reset(reset),
-        .lookup_valid(tlb_lookup_valid),
-        .lookup_vaddr(translate_vaddr),
-        .lookup_asid(translate_asid),
-        .lookup_hit(tlb_lookup_hit),
-        .lookup_paddr(tlb_lookup_paddr),
-        .lookup_permissions(tlb_lookup_permissions),
-        .write_valid(tlb_write_valid),
-        .write_vaddr(tlb_write_vaddr),
-        .write_paddr(tlb_write_paddr),
-        .write_asid(tlb_write_asid),
-        .write_permissions(tlb_write_permissions),
-        .invalidate_all(tlb_invalidate_all),
-        .invalidate_asid_valid(1'b0),
-        .invalidate_asid(8'd0),
-        .perf_hits(),     // Managed internally
-        .perf_misses()
+        .lookupValid(tlbLookupValid),
+        .lookupVaddr(translateVaddr),
+        .lookupAsid(translateAsid),
+        .lookupHit(tlbLookupHit),
+        .lookupPaddr(tlbLookupPaddr),
+        .lookupPermissions(tlbLookupPermissions),
+        .writeValid(tlbWriteValid),
+        .writeVaddr(tlbWriteVaddr),
+        .writePaddr(tlbWritePaddr),
+        .writeAsid(tlbWriteAsid),
+        .writePermissions(tlbWritePermissions),
+        .invalidateAll(tlbInvalidateAll),
+        .invalidateAsidValid(1'b0),
+        .invalidateAsid(8'd0),
+        .perfHits(),     // Managed internally
+        .perfMisses()
     );
 
     // Page Table Walker Signals
-    reg ptw_request_valid;
-    wire ptw_done;
-    wire ptw_fault;
-    wire [PHYSICAL_ADDR_BITS-1:0] ptw_paddr;
-    wire [2:0] ptw_permissions;
-    wire ptw_busy;
+    reg ptwRequestValid;
+    wire ptwDone;
+    wire ptwFault;
+    wire [PHYSICAL_ADDR_BITS-1:0] ptwPaddr;
+    wire [2:0] ptwPermissions;
+    wire ptwBusy;
 
-    page_table_walker #(
+    pageTableWalker #(
         .VIRTUAL_ADDR_BITS(VIRTUAL_ADDR_BITS),
         .PHYSICAL_ADDR_BITS(PHYSICAL_ADDR_BITS),
         .PAGE_OFFSET_BITS(PAGE_OFFSET_BITS),
         .PAGE_TABLE_LEVELS(4),
         .DATA_WIDTH(64)
-    ) u_ptw (
+    ) uPtw (
         .clk(clk),
         .reset(reset),
-        .walk_request_valid(ptw_request_valid),
-        .walk_vaddr(translate_vaddr),
-        .walk_asid(translate_asid),
-        .walk_done(ptw_done),
-        .walk_fault(ptw_fault),
-        .walk_paddr(ptw_paddr),
-        .walk_permissions(ptw_permissions),
-        .mem_read_valid(ptw_mem_read_valid),
-        .mem_read_addr(ptw_mem_read_addr),
-        .mem_read_ready(ptw_mem_read_ready),
-        .mem_read_data(ptw_mem_read_data),
-        .page_table_base_addr(page_table_base),
-        .busy(ptw_busy)
+        .walkRequestValid(ptwRequestValid),
+        .walkVaddr(translateVaddr),
+        .walkAsid(translateAsid),
+        .walkDone(ptwDone),
+        .walkFault(ptwFault),
+        .walkPaddr(ptwPaddr),
+        .walkPermissions(ptwPermissions),
+        .memReadValid(ptwMemReadValid),
+        .memReadAddr(ptwMemReadAddr),
+        .memReadReady(ptwMemReadReady),
+        .memReadData(ptwMemReadData),
+        .pageTableBaseAddr(pageTableBase),
+        .busy(ptwBusy)
     );
 
     typedef enum logic [1:0] {
         IDLE,
         TLB_LOOKUP,
         PTW_WAIT
-    } state_e;
+    } stateE;
     
-    state_e state;
+    stateE state;
     
     always @(posedge clk) begin
         if (reset) begin
             state <= IDLE;
-            translate_ready <= 0;
-            translate_paddr <= 0;
-            translate_fault <= 0;
-            tlb_lookup_valid <= 0;
-            tlb_write_valid <= 0;
-            ptw_request_valid <= 0;
-            perf_tlb_hits <= 0;
-            perf_tlb_misses <= 0;
-            perf_page_faults <= 0;
+            translateReady <= 0;
+            translatePaddr <= 0;
+            translateFault <= 0;
+            tlbLookupValid <= 0;
+            tlbWriteValid <= 0;
+            ptwRequestValid <= 0;
+            perfTlbHits <= 0;
+            perfTlbMisses <= 0;
+            perfPageFaults <= 0;
         end else begin
-            translate_ready <= 0;
-            translate_fault <= 0;
-            tlb_lookup_valid <= 0;
-            tlb_write_valid <= 0;
-            ptw_request_valid <= 0;
+            translateReady <= 0;
+            translateFault <= 0;
+            tlbLookupValid <= 0;
+            tlbWriteValid <= 0;
+            ptwRequestValid <= 0;
             
             case (state)
                 IDLE: begin
-                    if (translate_valid) begin
-                        tlb_lookup_valid <= 1;
+                    if (translateValid) begin
+                        tlbLookupValid <= 1;
                         state <= TLB_LOOKUP;
                     end
                 end
                 
                 TLB_LOOKUP: begin
                     // TLB takes 1 cycle
-                    if (tlb_lookup_hit) begin
+                    if (tlbLookupHit) begin
                         // Check permissions
-                        if (translate_write && !tlb_lookup_permissions[1]) begin // [1] is write permission
-                            translate_fault <= 1;
-                            translate_ready <= 1;
-                            perf_page_faults <= perf_page_faults + 1;
+                        if (translateWrite && !tlbLookupPermissions[1]) begin // [1] is write permission
+                            translateFault <= 1;
+                            translateReady <= 1;
+                            perfPageFaults <= perfPageFaults + 1;
                         end else begin
-                            translate_paddr <= tlb_lookup_paddr;
-                            translate_ready <= 1;
-                            perf_tlb_hits <= perf_tlb_hits + 1;
+                            translatePaddr <= tlbLookupPaddr;
+                            translateReady <= 1;
+                            perfTlbHits <= perfTlbHits + 1;
                         end
                         state <= IDLE;
                     end else begin
-                        perf_tlb_misses <= perf_tlb_misses + 1;
-                        ptw_request_valid <= 1;
+                        perfTlbMisses <= perfTlbMisses + 1;
+                        ptwRequestValid <= 1;
                         state <= PTW_WAIT;
                     end
                 end
                 
                 PTW_WAIT: begin
-                    if (ptw_done) begin
-                        if (ptw_fault) begin
-                            translate_fault <= 1;
-                            translate_ready <= 1;
-                            perf_page_faults <= perf_page_faults + 1;
+                    if (ptwDone) begin
+                        if (ptwFault) begin
+                            translateFault <= 1;
+                            translateReady <= 1;
+                            perfPageFaults <= perfPageFaults + 1;
                             state <= IDLE;
                         end else begin
                             // Fill TLB
-                            tlb_write_valid <= 1;
-                            tlb_write_vaddr <= translate_vaddr;
-                            tlb_write_paddr <= ptw_paddr;
-                            tlb_write_asid <= translate_asid;
-                            tlb_write_permissions <= ptw_permissions;
+                            tlbWriteValid <= 1;
+                            tlbWriteVaddr <= translateVaddr;
+                            tlbWritePaddr <= ptwPaddr;
+                            tlbWriteAsid <= translateAsid;
+                            tlbWritePermissions <= ptwPermissions;
                             
                             // Check permissions
-                            if (translate_write && !ptw_permissions[1]) begin
-                                translate_fault <= 1;
-                                translate_ready <= 1;
-                                perf_page_faults <= perf_page_faults + 1;
+                            if (translateWrite && !ptwPermissions[1]) begin
+                                translateFault <= 1;
+                                translateReady <= 1;
+                                perfPageFaults <= perfPageFaults + 1;
                             end else begin
-                                translate_paddr <= {ptw_paddr[PHYSICAL_ADDR_BITS-1:PAGE_OFFSET_BITS], translate_vaddr[PAGE_OFFSET_BITS-1:0]};
-                                translate_ready <= 1;
+                                translatePaddr <= {ptwPaddr[PHYSICAL_ADDR_BITS-1:PAGE_OFFSET_BITS], translateVaddr[PAGE_OFFSET_BITS-1:0]};
+                                translateReady <= 1;
                             end
                             state <= IDLE;
                         end
@@ -199,14 +199,14 @@ module mmu #(
         end
         
         // Debug prints (simulation only)
-        // synthesis translate_off
+        // synthesis translateOff
         if (!reset) begin
-            if (translate_valid)
-                $display("[%0t] [MMU] translate_valid=1, vaddr=%h, asid=%h", $time, translate_vaddr, translate_asid);
+            if (translateValid)
+                $display("[%0t] [MMU] translateValid=1, vaddr=%h, asid=%h", $time, translateVaddr, translateAsid);
             if (state != IDLE)
-                $display("[%0t] [MMU] state=%s, tlb_hit=%0b, ptw_req=%0b", $time, state.name(), tlb_lookup_hit, ptw_request_valid);
+                $display("[%0t] [MMU] state=%s, tlbHit=%0b, ptwReq=%0b", $time, state.name(), tlbLookupHit, ptwRequestValid);
         end
-        // synthesis translate_on
+        // synthesis translateOn
     end
 
 endmodule

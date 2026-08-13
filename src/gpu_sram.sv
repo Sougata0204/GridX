@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module gpu_sram #(
+module gpuSram #(
     parameter DATA_MEM_ADDR_BITS = 8,
     parameter DATA_MEM_DATA_BITS = 8,
     parameter DATA_MEM_NUM_CHANNELS = 4,
@@ -24,230 +24,231 @@ module gpu_sram #(
     input wire reset,
     input wire start,
     output wire done,
-    input wire device_control_write_enable,
-    input wire [7:0] device_control_data,
-    input wire sram_region_write_enable,
-    input wire [7:0] sram_base_in,
-    input wire [7:0] sram_limit_in,
-    output wire [PROGRAM_MEM_NUM_CHANNELS-1:0] program_mem_read_valid,
-    output wire [PROGRAM_MEM_ADDR_BITS-1:0] program_mem_read_address [PROGRAM_MEM_NUM_CHANNELS-1:0],
-    input wire [PROGRAM_MEM_NUM_CHANNELS-1:0] program_mem_read_ready,
-    input wire [PROGRAM_MEM_DATA_BITS-1:0] program_mem_read_data [PROGRAM_MEM_NUM_CHANNELS-1:0],
-    output wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_read_valid,
-    output wire [DATA_MEM_ADDR_BITS-1:0] data_mem_read_address [DATA_MEM_NUM_CHANNELS-1:0],
-    input wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_read_ready,
-    input wire [DATA_MEM_DATA_BITS-1:0] data_mem_read_data [DATA_MEM_NUM_CHANNELS-1:0],
-    output wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_write_valid,
-    output wire [DATA_MEM_ADDR_BITS-1:0] data_mem_write_address [DATA_MEM_NUM_CHANNELS-1:0],
-    output wire [DATA_MEM_DATA_BITS-1:0] data_mem_write_data [DATA_MEM_NUM_CHANNELS-1:0],
-    input wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_write_ready,
-    input wire dma_cmd_valid,
-    input wire dma_cmd_direction,
-    input wire [DATA_MEM_ADDR_BITS-1:0] dma_ext_addr,
-    input wire [10:0] dma_sram_addr,
-    input wire [7:0] dma_length,
-    output wire dma_cmd_ready,
-    output wire dma_done,
-    output wire dma_busy,
-    input wire [SRAM_NUM_BANKS-1:0] force_bank_enable,
-    input wire [SRAM_NUM_BANKS-1:0] force_bank_sleep,
-    output wire [SRAM_NUM_BANKS-1:0] bank_active,
-    output wire [1:0] bank_power_state [SRAM_NUM_BANKS-1:0],
-    output wire [SRAM_NUM_BANKS-1:0] bank_needs_reload
+    input wire deviceControlWriteEnable,
+    input wire [7:0] deviceControlData,
+    input wire sramRegionWriteEnable,
+    input wire [7:0] sramBaseIn,
+    input wire [7:0] sramLimitIn,
+    output wire [PROGRAM_MEM_NUM_CHANNELS-1:0] programMemReadValid,
+    output wire [PROGRAM_MEM_ADDR_BITS-1:0] programMemReadAddress [PROGRAM_MEM_NUM_CHANNELS-1:0],
+    input wire [PROGRAM_MEM_NUM_CHANNELS-1:0] programMemReadReady,
+    input wire [PROGRAM_MEM_DATA_BITS-1:0] programMemReadData [PROGRAM_MEM_NUM_CHANNELS-1:0],
+    output wire [DATA_MEM_NUM_CHANNELS-1:0] dataMemReadValid,
+    output wire [DATA_MEM_ADDR_BITS-1:0] dataMemReadAddress [DATA_MEM_NUM_CHANNELS-1:0],
+    input wire [DATA_MEM_NUM_CHANNELS-1:0] dataMemReadReady,
+    input wire [DATA_MEM_DATA_BITS-1:0] dataMemReadData [DATA_MEM_NUM_CHANNELS-1:0],
+    output wire [DATA_MEM_NUM_CHANNELS-1:0] dataMemWriteValid,
+    output wire [DATA_MEM_ADDR_BITS-1:0] dataMemWriteAddress [DATA_MEM_NUM_CHANNELS-1:0],
+    output wire [DATA_MEM_DATA_BITS-1:0] dataMemWriteData [DATA_MEM_NUM_CHANNELS-1:0],
+    input wire [DATA_MEM_NUM_CHANNELS-1:0] dataMemWriteReady,
+    input wire dmaCmdValid,
+    input wire dmaCmdDirection,
+    input wire [DATA_MEM_ADDR_BITS-1:0] dmaExtAddr,
+    input wire [10:0] dmaSramAddr,
+    input wire [7:0] dmaLength,
+    output wire dmaCmdReady,
+    output wire dmaDone,
+    output wire dmaBusy,
+    input wire [SRAM_NUM_BANKS-1:0] forceBankEnable,
+    input wire [SRAM_NUM_BANKS-1:0] forceBankSleep,
+    output wire [SRAM_NUM_BANKS-1:0] bankActive,
+    output wire [1:0] bankPowerState [SRAM_NUM_BANKS-1:0],
+    output wire [SRAM_NUM_BANKS-1:0] bankNeedsReload
 );
-    reg [7:0] sram_base_reg;
-    reg [7:0] sram_limit_reg;
+    reg [7:0] sramBaseReg;
+    reg [7:0] sramLimitReg;
     always @(posedge clk) begin
         if (reset) begin
-            sram_base_reg <= SRAM_BASE_DEFAULT;
-            sram_limit_reg <= SRAM_LIMIT_DEFAULT;
-        end else if (sram_region_write_enable) begin
-            sram_base_reg <= sram_base_in;
-            sram_limit_reg <= sram_limit_in;
+            sramBaseReg <= SRAM_BASE_DEFAULT;
+            sramLimitReg <= SRAM_LIMIT_DEFAULT;
+        end else if (sramRegionWriteEnable) begin
+            sramBaseReg <= sramBaseIn;
+            sramLimitReg <= sramLimitIn;
         end
     end
-    wire [7:0] thread_count;
-    reg [NUM_CORES-1:0] core_start;
-    reg [NUM_CORES-1:0] core_reset;
-    reg [NUM_CORES-1:0] core_done;
-    reg [7:0] core_block_id [NUM_CORES-1:0];
-    reg [$clog2(THREADS_PER_BLOCK):0] core_thread_count [NUM_CORES-1:0];
+    wire [7:0] threadCount;
+    reg [NUM_CORES-1:0] coreStart;
+    reg [NUM_CORES-1:0] coreReset;
+    reg [NUM_CORES-1:0] coreDone;
+    reg [7:0] coreBlockId [NUM_CORES-1:0];
+    reg [$clog2(THREADS_PER_BLOCK):0] coreThreadCount [NUM_CORES-1:0];
     localparam NUM_LSUS = NUM_CORES * THREADS_PER_BLOCK;
-    wire [NUM_LSUS-1:0] sram_read_valid;
-    wire [DATA_MEM_ADDR_BITS-1:0] sram_read_address [NUM_LSUS-1:0];
-    wire [NUM_LSUS-1:0] sram_read_ready;
-    wire [SRAM_DATA_WIDTH-1:0] sram_read_data [NUM_LSUS-1:0];
-    wire [NUM_LSUS-1:0] sram_write_valid;
-    wire [DATA_MEM_ADDR_BITS-1:0] sram_write_address [NUM_LSUS-1:0];
-    wire [SRAM_DATA_WIDTH-1:0] sram_write_data [NUM_LSUS-1:0];
-    wire [NUM_LSUS-1:0] sram_write_ready;
-    wire [NUM_LSUS-1:0] bank_conflict;
-    wire [NUM_LSUS-1:0] ext_read_valid;
-    wire [DATA_MEM_ADDR_BITS-1:0] ext_read_address [NUM_LSUS-1:0];
-    wire [NUM_LSUS-1:0] ext_read_ready;
-    wire [SRAM_DATA_WIDTH-1:0] ext_read_data [NUM_LSUS-1:0];
-    wire [NUM_LSUS-1:0] ext_write_valid;
-    wire [DATA_MEM_ADDR_BITS-1:0] ext_write_address [NUM_LSUS-1:0];
-    wire [SRAM_DATA_WIDTH-1:0] ext_write_data [NUM_LSUS-1:0];
-    wire [NUM_LSUS-1:0] ext_write_ready;
+    wire [NUM_LSUS-1:0] sramReadValid;
+    wire [DATA_MEM_ADDR_BITS-1:0] sramReadAddress [NUM_LSUS-1:0];
+    wire [NUM_LSUS-1:0] sramReadReady;
+    wire [SRAM_DATA_WIDTH-1:0] sramReadData [NUM_LSUS-1:0];
+    wire [NUM_LSUS-1:0] sramWriteValid;
+    wire [DATA_MEM_ADDR_BITS-1:0] sramWriteAddress [NUM_LSUS-1:0];
+    wire [SRAM_DATA_WIDTH-1:0] sramWriteData [NUM_LSUS-1:0];
+    wire [NUM_LSUS-1:0] sramWriteReady;
+    wire [NUM_LSUS-1:0] bankConflict;
+    wire [NUM_LSUS-1:0] extReadValid;
+    wire [DATA_MEM_ADDR_BITS-1:0] extReadAddress [NUM_LSUS-1:0];
+    wire [NUM_LSUS-1:0] extReadReady;
+    wire [SRAM_DATA_WIDTH-1:0] extReadData [NUM_LSUS-1:0];
+    wire [NUM_LSUS-1:0] extWriteValid;
+    wire [DATA_MEM_ADDR_BITS-1:0] extWriteAddress [NUM_LSUS-1:0];
+    wire [SRAM_DATA_WIDTH-1:0] extWriteData [NUM_LSUS-1:0];
+    wire [NUM_LSUS-1:0] extWriteReady;
     localparam NUM_FETCHERS = NUM_CORES;
-    reg [NUM_FETCHERS-1:0] fetcher_read_valid;
-    reg [PROGRAM_MEM_ADDR_BITS-1:0] fetcher_read_address [NUM_FETCHERS-1:0];
-    reg [NUM_FETCHERS-1:0] fetcher_read_ready;
-    reg [PROGRAM_MEM_DATA_BITS-1:0] fetcher_read_data [NUM_FETCHERS-1:0];
-    wire dma_ext_read_valid;
-    wire [DATA_MEM_ADDR_BITS-1:0] dma_ext_read_address;
-    wire dma_ext_read_ready;
-    wire [SRAM_DATA_WIDTH-1:0] dma_ext_read_data;
-    wire dma_ext_write_valid;
-    wire [DATA_MEM_ADDR_BITS-1:0] dma_ext_write_address;
-    wire [SRAM_DATA_WIDTH-1:0] dma_ext_write_data;
-    wire dma_ext_write_ready;
-    wire dma_sram_read_valid;
-    wire [10:0] dma_sram_read_address;
-    wire dma_sram_read_ready;
-    wire [SRAM_DATA_WIDTH-1:0] dma_sram_read_data;
-    wire dma_sram_write_valid;
-    wire [10:0] dma_sram_write_address;
-    wire [SRAM_DATA_WIDTH-1:0] dma_sram_write_data;
-    wire dma_sram_write_ready;
-    wire dma_error;
-    wire [7:0] dma_words_transferred;
-    dcr dcr_instance (
+    reg [NUM_FETCHERS-1:0] fetcherReadValid;
+    reg [PROGRAM_MEM_ADDR_BITS-1:0] fetcherReadAddress [NUM_FETCHERS-1:0];
+    reg [NUM_FETCHERS-1:0] fetcherReadReady;
+    reg [PROGRAM_MEM_DATA_BITS-1:0] fetcherReadData [NUM_FETCHERS-1:0];
+    wire dmaExtReadValid;
+    wire [DATA_MEM_ADDR_BITS-1:0] dmaExtReadAddress;
+    wire dmaExtReadReady;
+    wire [SRAM_DATA_WIDTH-1:0] dmaExtReadData;
+    wire dmaExtWriteValid;
+    wire [DATA_MEM_ADDR_BITS-1:0] dmaExtWriteAddress;
+    wire [SRAM_DATA_WIDTH-1:0] dmaExtWriteData;
+    wire dmaExtWriteReady;
+    wire dmaSramReadValid;
+    wire [10:0] dmaSramReadAddress;
+    wire dmaSramReadReady;
+    wire [SRAM_DATA_WIDTH-1:0] dmaSramReadData;
+    wire dmaSramWriteValid;
+    wire [10:0] dmaSramWriteAddress;
+    wire [SRAM_DATA_WIDTH-1:0] dmaSramWriteData;
+    wire dmaSramWriteReady;
+    wire dmaError;
+    wire [7:0] dmaWordsTransferred;
+    dcr dcrInstance (
         .clk(clk),
         .reset(reset),
-        .device_control_write_enable(device_control_write_enable),
-        .device_control_data(device_control_data),
-        .thread_count(thread_count)
+        .deviceControlWriteEnable(deviceControlWriteEnable),
+        .deviceControlData(deviceControlData),
+        .threadCount(threadCount),
+        .dcrValid()
     );
     generate
-        if (ENABLE_SRAM_TILE_BUFFER) begin : sram_subsystem
-            sram_controller #(
+        if (ENABLE_SRAM_TILE_BUFFER) begin : sramSubsystem
+            sramController #(
                 .NUM_CORES(NUM_CORES),
                 .THREADS_PER_BLOCK(THREADS_PER_BLOCK),
                 .NUM_BANKS(SRAM_NUM_BANKS),
                 .BANK_DEPTH(SRAM_BANK_DEPTH),
                 .DATA_WIDTH(SRAM_DATA_WIDTH),
                 .ADDR_BITS(DATA_MEM_ADDR_BITS)
-            ) sram_ctrl_inst (
+            ) sramCtrlInst (
                 .clk(clk),
                 .reset(reset),
-                .sram_base_reg(sram_base_reg),
-                .sram_limit_reg(sram_limit_reg),
-                .core_read_valid(sram_read_valid),
-                .core_read_address(sram_read_address),
-                .core_read_ready(sram_read_ready),
-                .core_read_data(sram_read_data),
-                .core_write_valid(sram_write_valid),
-                .core_write_address(sram_write_address),
-                .core_write_data(sram_write_data),
-                .core_write_ready(sram_write_ready),
-                .core_bank_conflict(bank_conflict),
-                .ext_read_valid(ext_read_valid),
-                .ext_read_address(ext_read_address),
-                .ext_read_ready(ext_read_ready),
-                .ext_read_data(ext_read_data),
-                .ext_write_valid(ext_write_valid),
-                .ext_write_address(ext_write_address),
-                .ext_write_data(ext_write_data),
-                .ext_write_ready(ext_write_ready),
-                .dma_read_valid(dma_sram_read_valid),
-                .dma_read_address(dma_sram_read_address[DATA_MEM_ADDR_BITS-1:0]),
-                .dma_read_ready(dma_sram_read_ready),
-                .dma_read_data(dma_sram_read_data),
-                .dma_write_valid(dma_sram_write_valid),
-                .dma_write_address(dma_sram_write_address[DATA_MEM_ADDR_BITS-1:0]),
-                .dma_write_data(dma_sram_write_data),
-                .dma_write_ready(dma_sram_write_ready),
-                .force_bank_enable(force_bank_enable),
-                .force_bank_sleep(force_bank_sleep),
-                .bank_active(bank_active),
-                .bank_power_state(bank_power_state),
-                .bank_needs_reload(bank_needs_reload)
+                .sramBaseReg(sramBaseReg),
+                .sramLimitReg(sramLimitReg),
+                .coreReadValid(sramReadValid),
+                .coreReadAddress(sramReadAddress),
+                .coreReadReady(sramReadReady),
+                .coreReadData(sramReadData),
+                .coreWriteValid(sramWriteValid),
+                .coreWriteAddress(sramWriteAddress),
+                .coreWriteData(sramWriteData),
+                .coreWriteReady(sramWriteReady),
+                .coreBankConflict(bankConflict),
+                .extReadValid(extReadValid),
+                .extReadAddress(extReadAddress),
+                .extReadReady(extReadReady),
+                .extReadData(extReadData),
+                .extWriteValid(extWriteValid),
+                .extWriteAddress(extWriteAddress),
+                .extWriteData(extWriteData),
+                .extWriteReady(extWriteReady),
+                .dmaReadValid(dmaSramReadValid),
+                .dmaReadAddress(dmaSramReadAddress[DATA_MEM_ADDR_BITS-1:0]),
+                .dmaReadReady(dmaSramReadReady),
+                .dmaReadData(dmaSramReadData),
+                .dmaWriteValid(dmaSramWriteValid),
+                .dmaWriteAddress(dmaSramWriteAddress[DATA_MEM_ADDR_BITS-1:0]),
+                .dmaWriteData(dmaSramWriteData),
+                .dmaWriteReady(dmaSramWriteReady),
+                .forceBankEnable(forceBankEnable),
+                .forceBankSleep(forceBankSleep),
+                .bankActive(bankActive),
+                .bankPowerState(bankPowerState),
+                .bankNeedsReload(bankNeedsReload)
             );
         end
     endgenerate
     generate
-        if (ENABLE_DMA) begin : dma_subsystem
-            dma_engine #(
+        if (ENABLE_DMA) begin : dmaSubsystem
+            dmaEngine #(
                 .ADDR_BITS(DATA_MEM_ADDR_BITS),
                 .DATA_WIDTH(SRAM_DATA_WIDTH),
                 .BURST_SIZE(DMA_BURST_SIZE)
-            ) dma_inst (
+            ) dmaInst (
                 .clk(clk),
                 .reset(reset),
-                .cmd_valid(dma_cmd_valid),
-                .cmd_direction(dma_cmd_direction),
-                .cmd_ext_addr(dma_ext_addr),
-                .cmd_sram_addr(dma_sram_addr),
-                .cmd_length(dma_length),
-                .cmd_ready(dma_cmd_ready),
-                .cmd_done(dma_done),
-                .cmd_error(dma_error),
-                .ext_read_valid(dma_ext_read_valid),
-                .ext_read_address(dma_ext_read_address),
-                .ext_read_ready(dma_ext_read_ready),
-                .ext_read_data(dma_ext_read_data),
-                .ext_write_valid(dma_ext_write_valid),
-                .ext_write_address(dma_ext_write_address),
-                .ext_write_data(dma_ext_write_data),
-                .ext_write_ready(dma_ext_write_ready),
-                .sram_read_valid(dma_sram_read_valid),
-                .sram_read_address(dma_sram_read_address),
-                .sram_read_ready(dma_sram_read_ready),
-                .sram_read_data(dma_sram_read_data),
-                .sram_write_valid(dma_sram_write_valid),
-                .sram_write_address(dma_sram_write_address),
-                .sram_write_data(dma_sram_write_data),
-                .sram_write_ready(dma_sram_write_ready),
-                .busy(dma_busy),
-                .words_transferred(dma_words_transferred)
+                .cmdValid(dmaCmdValid),
+                .cmdDirection(dmaCmdDirection),
+                .cmdExtAddr(dmaExtAddr),
+                .cmdSramAddr(dmaSramAddr),
+                .cmdLength(dmaLength),
+                .cmdReady(dmaCmdReady),
+                .cmdDone(dmaDone),
+                .cmdError(dmaError),
+                .extReadValid(dmaExtReadValid),
+                .extReadAddress(dmaExtReadAddress),
+                .extReadReady(dmaExtReadReady),
+                .extReadData(dmaExtReadData),
+                .extWriteValid(dmaExtWriteValid),
+                .extWriteAddress(dmaExtWriteAddress),
+                .extWriteData(dmaExtWriteData),
+                .extWriteReady(dmaExtWriteReady),
+                .sramReadValid(dmaSramReadValid),
+                .sramReadAddress(dmaSramReadAddress),
+                .sramReadReady(dmaSramReadReady),
+                .sramReadData(dmaSramReadData),
+                .sramWriteValid(dmaSramWriteValid),
+                .sramWriteAddress(dmaSramWriteAddress),
+                .sramWriteData(dmaSramWriteData),
+                .sramWriteReady(dmaSramWriteReady),
+                .busy(dmaBusy),
+                .wordsTransferred(dmaWordsTransferred)
             );
-        end else begin : no_dma
-            assign dma_cmd_ready = 1'b0;
-            assign dma_done = 1'b0;
-            assign dma_busy = 1'b0;
+        end else begin : noDma
+            assign dmaCmdReady = 1'b0;
+            assign dmaDone = 1'b0;
+            assign dmaBusy = 1'b0;
         end
     endgenerate
     dispatch #(
         .NUM_CORES(NUM_CORES),
         .THREADS_PER_BLOCK(THREADS_PER_BLOCK)
-    ) dispatch_instance (
+    ) dispatchInstance (
         .clk(clk),
         .reset(reset),
         .start(start),
-        .thread_count(thread_count),
-        .core_done(core_done),
-        .core_start(core_start),
-        .core_reset(core_reset),
-        .core_block_id(core_block_id),
-        .core_thread_count(core_thread_count),
-        .all_blocks_done(done)
+        .threadCount(threadCount),
+        .coreDone(coreDone),
+        .coreStart(coreStart),
+        .coreReset(coreReset),
+        .coreBlockId(coreBlockId),
+        .coreThreadCount(coreThreadCount),
+        .allBlocksDone(done)
     );
     controller #(
         .ADDR_BITS(DATA_MEM_ADDR_BITS),
         .DATA_BITS(DATA_MEM_DATA_BITS),
         .NUM_CONSUMERS(NUM_LSUS),
         .NUM_CHANNELS(DATA_MEM_NUM_CHANNELS)
-    ) data_memory_controller (
+    ) dataMemoryController (
         .clk(clk),
         .reset(reset),
-        .consumer_read_valid(ext_read_valid),
-        .consumer_read_address(ext_read_address),
-        .consumer_read_ready(ext_read_ready),
-        .consumer_read_data(ext_read_data),
-        .consumer_write_valid(ext_write_valid),
-        .consumer_write_address(ext_write_address),
-        .consumer_write_data(ext_write_data),
-        .consumer_write_ready(ext_write_ready),
-        .mem_read_valid(data_mem_read_valid),
-        .mem_read_address(data_mem_read_address),
-        .mem_read_ready(data_mem_read_ready),
-        .mem_read_data(data_mem_read_data),
-        .mem_write_valid(data_mem_write_valid),
-        .mem_write_address(data_mem_write_address),
-        .mem_write_data(data_mem_write_data),
-        .mem_write_ready(data_mem_write_ready)
+        .consumerReadValid(extReadValid),
+        .consumerReadAddress(extReadAddress),
+        .consumerReadReady(extReadReady),
+        .consumerReadData(extReadData),
+        .consumerWriteValid(extWriteValid),
+        .consumerWriteAddress(extWriteAddress),
+        .consumerWriteData(extWriteData),
+        .consumerWriteReady(extWriteReady),
+        .memReadValid(dataMemReadValid),
+        .memReadAddress(dataMemReadAddress),
+        .memReadReady(dataMemReadReady),
+        .memReadData(dataMemReadData),
+        .memWriteValid(dataMemWriteValid),
+        .memWriteAddress(dataMemWriteAddress),
+        .memWriteData(dataMemWriteData),
+        .memWriteReady(dataMemWriteReady)
     );
     controller #(
         .ADDR_BITS(PROGRAM_MEM_ADDR_BITS),
@@ -255,16 +256,16 @@ module gpu_sram #(
         .NUM_CONSUMERS(NUM_FETCHERS),
         .NUM_CHANNELS(PROGRAM_MEM_NUM_CHANNELS),
         .WRITE_ENABLE(0)
-    ) program_memory_controller (
+    ) programMemoryController (
         .clk(clk),
         .reset(reset),
-        .consumer_read_valid(fetcher_read_valid),
-        .consumer_read_address(fetcher_read_address),
-        .consumer_read_ready(fetcher_read_ready),
-        .consumer_read_data(fetcher_read_data),
-        .mem_read_valid(program_mem_read_valid),
-        .mem_read_address(program_mem_read_address),
-        .mem_read_ready(program_mem_read_ready),
-        .mem_read_data(program_mem_read_data)
+        .consumerReadValid(fetcherReadValid),
+        .consumerReadAddress(fetcherReadAddress),
+        .consumerReadReady(fetcherReadReady),
+        .consumerReadData(fetcherReadData),
+        .memReadValid(programMemReadValid),
+        .memReadAddress(programMemReadAddress),
+        .memReadReady(programMemReadReady),
+        .memReadData(programMemReadData)
     );
 endmodule

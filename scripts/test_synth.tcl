@@ -10,7 +10,6 @@ set OUTPUT_DIR   [file join $PROJECT_ROOT vivado_output]
 
 file mkdir $OUTPUT_DIR
 
-# ---- Source files ----
 set SRC_DIR      [file join $PROJECT_ROOT src]
 set MESH_DIR     [file join $PROJECT_ROOT memory_mesh src]
 
@@ -92,7 +91,6 @@ set SRC_FILES [list \
     $SRC_DIR/gridx_kernel_top.sv \
 ]
 
-# ---- Read Sources ----
 puts " GridX³ — Vivado Synthesis Test"
 puts " Top:  $TOP_MODULE"
 puts " Part: $PART"
@@ -101,7 +99,6 @@ puts " Config: 2x2x2 = 8 cores, 1 warp, 4 threads"
 read_verilog -sv $SRC_FILES
 read_xdc [file join $PROJECT_ROOT constraints gridx_kernel_top.xdc]
 
-# ---- Synthesis Only ----
 puts "\n>>> Running Synthesis..."
 synth_design -top $TOP_MODULE -part $PART \
     -flatten_hierarchy rebuilt \

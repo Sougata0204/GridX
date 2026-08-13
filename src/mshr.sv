@@ -1,80 +1,80 @@
-
 `default_nettype none
 `timescale 1ns/1ns
 
+// my mshr tracks outstanding memory requests
 module mshr #(
-    parameter ENTRIES = 32,
-    parameter ADDR_WIDTH = 22,
-    parameter WARP_ID_WIDTH = 3,
-    parameter REG_ID_WIDTH = 4
+    parameter Entries = 32,
+    parameter AddrWidth = 22,
+    parameter WarpIdWidth = 3,
+    parameter RegIdWidth = 4
 ) (
     input  wire clk,
     input  wire reset,
 
-    input  wire                      alloc_valid,
-    input  wire [ADDR_WIDTH-1:0]     alloc_addr,
-    input  wire [WARP_ID_WIDTH-1:0]  alloc_warp_id,
-    input  wire [REG_ID_WIDTH-1:0]   alloc_dest_reg,
-    output wire                      alloc_ready,
+    input  wire                      allocValid,
+    input  wire [AddrWidth-1:0]      allocAddr,
+    input  wire [WarpIdWidth-1:0]    allocWarpId,
+    input  wire [RegIdWidth-1:0]     allocDestReg,
+    output wire                      allocReady,
 
-    input  wire                      resp_valid,
-    input  wire [ADDR_WIDTH-1:0]     resp_addr,
+    input  wire                      respValid,
+    input  wire [AddrWidth-1:0]      respAddr,
 
-    output reg                       wakeup_valid,
-    output reg  [WARP_ID_WIDTH-1:0]  wakeup_warp_id,
-    output reg  [REG_ID_WIDTH-1:0]   wakeup_dest_reg,
-    output wire                      mshr_full
+    output reg                       wakeupValid,
+    output reg  [WarpIdWidth-1:0]    wakeupWarpId,
+    output reg  [RegIdWidth-1:0]     wakeupDestReg,
+    output wire                      mshrFull
 );
 
-    reg [ENTRIES-1:0]       valid;
-    reg [ADDR_WIDTH-1:0]    addr      [ENTRIES-1:0];
-    reg [WARP_ID_WIDTH-1:0] warp_id   [ENTRIES-1:0];
-    reg [REG_ID_WIDTH-1:0]  dest_reg  [ENTRIES-1:0];
+    reg [Entries-1:0]       validFlags;
+    reg [AddrWidth-1:0]     addrArray      [Entries-1:0];
+    reg [WarpIdWidth-1:0]   warpIdArray   [Entries-1:0];
+    reg [RegIdWidth-1:0]    destRegArray  [Entries-1:0];
 
-    wire [ENTRIES-1:0] free_slots = ~valid;
-    assign mshr_full = (free_slots == 0);
-    assign alloc_ready = !mshr_full;
+    wire [Entries-1:0] freeSlots = ~validFlags;
+    assign mshrFull = (freeSlots == 0);
+    assign allocReady = !mshrFull;
 
-    reg [$clog2(ENTRIES)-1:0] free_idx;
+    reg [$clog2(Entries)-1:0] freeIdx;
     always @(*) begin
-        free_idx = 0;
-        for (integer i = ENTRIES-1; i >= 0; i = i - 1) begin
-            if (!valid[i]) free_idx = i;
+        freeIdx = 0;
+        for (integer i = Entries-1; i >= 0; i = i - 1) begin
+            if (!validFlags[i]) freeIdx = i;
         end
     end
 
-    reg [$clog2(ENTRIES)-1:0] match_idx;
-    reg                       match_found;
+    reg [$clog2(Entries)-1:0] matchIdx;
+    reg                       matchFound;
     always @(*) begin
-        match_idx = 0;
-        match_found = 0;
-        for (integer i = 0; i < ENTRIES; i = i + 1) begin
-            if (valid[i] && addr[i] == resp_addr) begin
-                match_idx = i;
-                match_found = 1;
+        matchIdx = 0;
+        matchFound = 0;
+        for (integer i = 0; i < Entries; i = i + 1) begin
+            if (validFlags[i] && addrArray[i] == respAddr) begin
+                matchIdx = i;
+                matchFound = 1;
             end
         end
     end
 
     always @(posedge clk) begin
         if (reset) begin
-            valid <= 0;
-            wakeup_valid <= 0;
+            validFlags <= 0;
+            wakeupValid <= 0;
         end else begin
-            wakeup_valid <= 0;
+            wakeupValid <= 0;
 
-            if (alloc_valid && alloc_ready) begin
-                valid[free_idx] <= 1;
-                addr[free_idx] <= alloc_addr;
-                warp_id[free_idx] <= alloc_warp_id;
-                dest_reg[free_idx] <= alloc_dest_reg;
+            if (allocValid && allocReady) begin
+                validFlags[freeIdx] <= 1;
+                addrArray[freeIdx] <= allocAddr;
+                warpIdArray[freeIdx] <= allocWarpId;
+                destRegArray[freeIdx] <= allocDestReg;
             end
 
-            if (resp_valid && match_found) begin
-                valid[match_idx] <= 0;
-                wakeup_valid <= 1;
-                wakeup_warp_id <= warp_id[match_idx];
-                wakeup_dest_reg <= dest_reg[match_idx];
+            if (respValid && matchFound) begin
+                validFlags[matchIdx] <= 0;
+                wakeupValid <= 1;
+                wakeupWarpId <= warpIdArray[matchIdx];
+                wakeupDestReg <= destRegArray[matchIdx];
             end
         end
     end

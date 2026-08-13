@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module tensor_unit_mx #(
+module tensorUnitMx #(
     parameter DIM = 4,
     parameter MX_BLOCK_SIZE = 32,
     parameter MX_EXP_BITS = 8
@@ -11,20 +11,20 @@ module tensor_unit_mx #(
     input  wire reset,
     
     input  wire start,
-    input  wire [2:0] precision_mode, // 0: FP16, 1: FP8, 2: MX4, 3: MX6, 4: MX8, 5: INT8
+    input  wire [2:0] precisionMode, // 0: FP16, 1: FP8, 2: MX4, 3: MX6, 4: MX8, 5: INT8
     
-    input  wire [(DIM*DIM*16)-1:0] matrix_a_data,
-    input  wire [(DIM*DIM*16)-1:0] matrix_b_data,
-    input  wire [(DIM*DIM*32)-1:0] matrix_c_data,
+    input  wire [(DIM*DIM*16)-1:0] matrixAData,
+    input  wire [(DIM*DIM*16)-1:0] matrixBData,
+    input  wire [(DIM*DIM*32)-1:0] matrixCData,
     
-    input  wire [MX_EXP_BITS-1:0] shared_exp_a,
-    input  wire [MX_EXP_BITS-1:0] shared_exp_b,
+    input  wire [MX_EXP_BITS-1:0] sharedExpA,
+    input  wire [MX_EXP_BITS-1:0] sharedExpB,
     
     output reg  done,
     output reg  busy,
-    output reg  [(DIM*DIM*32)-1:0] matrix_d_data,
-    output reg  [15:0] macs_executed,
-    output reg  [7:0] effective_tflops_ratio
+    output reg  [(DIM*DIM*32)-1:0] matrixDData,
+    output reg  [15:0] macsExecuted,
+    output reg  [7:0] effectiveTflopsRatio
 );
 
     localparam MODE_FP16 = 3'd0;
@@ -38,11 +38,11 @@ module tensor_unit_mx #(
         IDLE,
         COMPUTE,
         FINISH
-    } state_e;
+    } stateE;
     
-    state_e state;
+    stateE state;
     
-    reg [4:0] compute_cycles;
+    reg [4:0] computeCycles;
     
     // Simple placeholder logic for MX4 tensor unit
     always @(posedge clk) begin
@@ -50,10 +50,10 @@ module tensor_unit_mx #(
             state <= IDLE;
             done <= 0;
             busy <= 0;
-            matrix_d_data <= 0;
-            macs_executed <= 0;
-            effective_tflops_ratio <= 0;
-            compute_cycles <= 0;
+            matrixDData <= 0;
+            macsExecuted <= 0;
+            effectiveTflopsRatio <= 0;
+            computeCycles <= 0;
         end else begin
             done <= 0;
             
@@ -61,21 +61,21 @@ module tensor_unit_mx #(
                 IDLE: begin
                     if (start) begin
                         busy <= 1;
-                        compute_cycles <= 4; // Simulated latency
+                        computeCycles <= 4; // Simulated latency
                         state <= COMPUTE;
                         
                         // Set effective ratio based on mode
-                        if (precision_mode == MODE_MX4) effective_tflops_ratio <= 4;
-                        else if (precision_mode == MODE_FP8) effective_tflops_ratio <= 2;
-                        else effective_tflops_ratio <= 1;
+                        if (precisionMode == MODE_MX4) effectiveTflopsRatio <= 4;
+                        else if (precisionMode == MODE_FP8) effectiveTflopsRatio <= 2;
+                        else effectiveTflopsRatio <= 1;
                     end
                 end
                 
                 COMPUTE: begin
-                    if (compute_cycles == 0) begin
+                    if (computeCycles == 0) begin
                         state <= FINISH;
                     end else begin
-                        compute_cycles <= compute_cycles - 1;
+                        computeCycles <= computeCycles - 1;
                     end
                 end
                 
@@ -85,9 +85,9 @@ module tensor_unit_mx #(
                     
                     // Simulated result: D = A * B + C
                     // Since this is a placeholder, we just pass C through + some dummy logic
-                    matrix_d_data <= matrix_c_data ^ {matrix_a_data, matrix_b_data[DIM*DIM*16-1:0]};
+                    matrixDData <= matrixCData ^ {matrixAData, matrixBData[DIM*DIM*16-1:0]};
                     
-                    macs_executed <= macs_executed + (DIM * DIM * DIM); // Standard matrix multiply MAC count
+                    macsExecuted <= macsExecuted + (DIM * DIM * DIM); // Standard matrix multiply MAC count
                     state <= IDLE;
                 end
                 

@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module warp_mem_unit #(
+module warpMemUnit #(
     parameter THREADS_PER_WARP = 4,
     parameter ADDR_WIDTH = 16,
     parameter DATA_WIDTH = 8,
@@ -11,23 +11,23 @@ module warp_mem_unit #(
     input wire clk,
     input wire reset,
     input wire start,
-    input wire is_read,
+    input wire isRead,
     output reg busy,
     output reg done,
-    input wire [ADDR_WIDTH-1:0] thread_addr [THREADS_PER_WARP-1:0],
-    input wire [THREADS_PER_WARP-1:0] thread_valid,
-    input wire [DATA_WIDTH-1:0] thread_write_data [THREADS_PER_WARP-1:0],
-    output reg [MAX_TRANSACTIONS-1:0] txn_valid,
-    output reg [ADDR_WIDTH-1:0] txn_base_addr [MAX_TRANSACTIONS-1:0],
-    output reg [THREADS_PER_WARP-1:0] txn_thread_mask [MAX_TRANSACTIONS-1:0],
-    output reg [DATA_WIDTH*THREADS_PER_WARP-1:0] txn_write_data [MAX_TRANSACTIONS-1:0],
-    output reg txn_is_read,
-    input wire [MAX_TRANSACTIONS-1:0] txn_ready,
-    input wire [DATA_WIDTH*THREADS_PER_WARP-1:0] txn_read_data [MAX_TRANSACTIONS-1:0],
-    output reg [DATA_WIDTH-1:0] thread_read_data [THREADS_PER_WARP-1:0],
-    output reg [THREADS_PER_WARP-1:0] thread_read_valid,
-    output reg [7:0] coalesced_count,
-    output reg [7:0] transaction_count
+    input wire [ADDR_WIDTH-1:0] threadAddr [THREADS_PER_WARP-1:0],
+    input wire [THREADS_PER_WARP-1:0] threadValid,
+    input wire [DATA_WIDTH-1:0] threadWriteData [THREADS_PER_WARP-1:0],
+    output reg [MAX_TRANSACTIONS-1:0] txnValid,
+    output reg [ADDR_WIDTH-1:0] txnBaseAddr [MAX_TRANSACTIONS-1:0],
+    output reg [THREADS_PER_WARP-1:0] txnThreadMask [MAX_TRANSACTIONS-1:0],
+    output reg [DATA_WIDTH*THREADS_PER_WARP-1:0] txnWriteData [MAX_TRANSACTIONS-1:0],
+    output reg txnIsRead,
+    input wire [MAX_TRANSACTIONS-1:0] txnReady,
+    input wire [DATA_WIDTH*THREADS_PER_WARP-1:0] txnReadData [MAX_TRANSACTIONS-1:0],
+    output reg [DATA_WIDTH-1:0] threadReadData [THREADS_PER_WARP-1:0],
+    output reg [THREADS_PER_WARP-1:0] threadReadValid,
+    output reg [7:0] coalescedCount,
+    output reg [7:0] transactionCount
 );
     localparam IDLE = 3'b000,
                ANALYZE = 3'b001,
@@ -36,103 +36,103 @@ module warp_mem_unit #(
                DISTRIBUTE = 3'b100,
                COMPLETE = 3'b101;
     reg [2:0] state;
-    reg [1:0] current_txn;
+    reg [1:0] currentTxn;
     localparam SEGMENT_BITS = 6;
-    reg [ADDR_WIDTH-SEGMENT_BITS-1:0] segment_base [MAX_TRANSACTIONS-1:0];
-    reg [THREADS_PER_WARP-1:0] segment_mask [MAX_TRANSACTIONS-1:0];
-    reg [1:0] num_segments;
-    reg [THREADS_PER_WARP-1:0] remaining_threads;
-    reg [ADDR_WIDTH-SEGMENT_BITS-1:0] first_segment;
+    reg [ADDR_WIDTH-SEGMENT_BITS-1:0] segmentBase [MAX_TRANSACTIONS-1:0];
+    reg [THREADS_PER_WARP-1:0] segmentMask [MAX_TRANSACTIONS-1:0];
+    reg [1:0] numSegments;
+    reg [THREADS_PER_WARP-1:0] remainingThreads;
+    reg [ADDR_WIDTH-SEGMENT_BITS-1:0] firstSegment;
     integer t, s;
     always @(posedge clk) begin
         if (reset) begin
             state <= IDLE;
             busy <= 1'b0;
             done <= 1'b0;
-            current_txn <= 0;
-            num_segments <= 0;
-            coalesced_count <= 0;
-            transaction_count <= 0;
+            currentTxn <= 0;
+            numSegments <= 0;
+            coalescedCount <= 0;
+            transactionCount <= 0;
             for (t = 0; t < MAX_TRANSACTIONS; t = t + 1) begin
-                txn_valid[t] <= 1'b0;
-                txn_base_addr[t] <= 0;
-                txn_thread_mask[t] <= 0;
-                segment_base[t] <= 0;
-                segment_mask[t] <= 0;
+                txnValid[t] <= 1'b0;
+                txnBaseAddr[t] <= 0;
+                txnThreadMask[t] <= 0;
+                segmentBase[t] <= 0;
+                segmentMask[t] <= 0;
             end
             for (t = 0; t < THREADS_PER_WARP; t = t + 1) begin
-                thread_read_data[t] <= 0;
+                threadReadData[t] <= 0;
             end
-            thread_read_valid <= 0;
-            remaining_threads <= 0;
+            threadReadValid <= 0;
+            remainingThreads <= 0;
         end else begin
             done <= 1'b0;
             case (state)
                 IDLE: begin
                     busy <= 1'b0;
-                    if (start && (|thread_valid)) begin
+                    if (start && (|threadValid)) begin
                         busy <= 1'b1;
                         state <= ANALYZE;
-                        remaining_threads <= thread_valid;
-                        num_segments <= 0;
-                        coalesced_count <= 0;
-                        transaction_count <= 0;
-                        txn_is_read <= is_read;
+                        remainingThreads <= threadValid;
+                        numSegments <= 0;
+                        coalescedCount <= 0;
+                        transactionCount <= 0;
+                        txnIsRead <= isRead;
                         for (t = 0; t < MAX_TRANSACTIONS; t = t + 1) begin
-                            txn_valid[t] <= 1'b0;
-                            segment_mask[t] <= 0;
+                            txnValid[t] <= 1'b0;
+                            segmentMask[t] <= 0;
                         end
                     end
                 end
                 ANALYZE: begin
-                    first_segment = 0;
+                    firstSegment = 0;
                     for (t = 0; t < THREADS_PER_WARP; t = t + 1) begin
-                        if (remaining_threads[t]) begin
-                            first_segment = thread_addr[t][ADDR_WIDTH-1:SEGMENT_BITS];
+                        if (remainingThreads[t]) begin
+                            firstSegment = threadAddr[t][ADDR_WIDTH-1:SEGMENT_BITS];
                             break;
                         end
                     end
-                    if (num_segments < MAX_TRANSACTIONS) begin
-                        segment_base[num_segments] <= first_segment;
+                    if (numSegments < MAX_TRANSACTIONS) begin
+                        segmentBase[numSegments] <= firstSegment;
                         for (t = 0; t < THREADS_PER_WARP; t = t + 1) begin
-                            if (remaining_threads[t]) begin
-                                if (thread_addr[t][ADDR_WIDTH-1:SEGMENT_BITS] == first_segment) begin
-                                    segment_mask[num_segments][t] <= 1'b1;
-                                    remaining_threads[t] <= 1'b0;
-                                    coalesced_count <= coalesced_count + 1;
+                            if (remainingThreads[t]) begin
+                                if (threadAddr[t][ADDR_WIDTH-1:SEGMENT_BITS] == firstSegment) begin
+                                    segmentMask[numSegments][t] <= 1'b1;
+                                    remainingThreads[t] <= 1'b0;
+                                    coalescedCount <= coalescedCount + 1;
                                 end
                             end
                         end
-                        num_segments <= num_segments + 1;
+                        numSegments <= numSegments + 1;
                     end
-                    if ((remaining_threads == 0) || (num_segments >= MAX_TRANSACTIONS - 1)) begin
+                    if ((remainingThreads == 0) || (numSegments >= MAX_TRANSACTIONS - 1)) begin
                         state <= EMIT_TXN;
-                        current_txn <= 0;
+                        currentTxn <= 0;
                     end
                 end
                 EMIT_TXN: begin
                     for (s = 0; s < MAX_TRANSACTIONS; s = s + 1) begin
-                        if (s < num_segments) begin
-                            txn_valid[s] <= 1'b1;
-                            txn_base_addr[s] <= {segment_base[s], {SEGMENT_BITS{1'b0}}};
-                            txn_thread_mask[s] <= segment_mask[s];
-                            transaction_count <= transaction_count + 1;
-                            if (!is_read) begin
+                        if (s < numSegments) begin
+                            txnValid[s] <= 1'b1;
+                            txnBaseAddr[s] <= {segmentBase[s], {SEGMENT_BITS{1'b0}}};
+                            txnThreadMask[s] <= segmentMask[s];
+                            transactionCount <= transactionCount + 1;
+                            if (!isRead) begin
                                 for (t = 0; t < THREADS_PER_WARP; t = t + 1) begin
-                                    if (segment_mask[s][t]) begin
-                                        txn_write_data[s][t*DATA_WIDTH +: DATA_WIDTH] <= thread_write_data[t];
+                                    if (segmentMask[s][t]) begin
+                                        txnWriteData[s][t*DATA_WIDTH +: DATA_WIDTH] <= threadWriteData[t];
                                     end
                                 end
                             end
                         end else begin
-                            txn_valid[s] <= 1'b0;
+                            txnValid[s] <= 1'b0;
                         end
                     end
                     state <= WAIT_RESP;
                 end
                 WAIT_RESP: begin
-                    if ((txn_valid & txn_ready) == txn_valid) begin
-                        if (is_read) begin
+                    if ((txnValid & txnReady) == txnValid) begin
+                        if (isRead) begin
                             state <= DISTRIBUTE;
                         end else begin
                             state <= COMPLETE;
@@ -141,11 +141,11 @@ module warp_mem_unit #(
                 end
                 DISTRIBUTE: begin
                     for (s = 0; s < MAX_TRANSACTIONS; s = s + 1) begin
-                        if (txn_valid[s]) begin
+                        if (txnValid[s]) begin
                             for (t = 0; t < THREADS_PER_WARP; t = t + 1) begin
-                                if (txn_thread_mask[s][t]) begin
-                                    thread_read_data[t] <= txn_read_data[s][t*DATA_WIDTH +: DATA_WIDTH];
-                                    thread_read_valid[t] <= 1'b1;
+                                if (txnThreadMask[s][t]) begin
+                                    threadReadData[t] <= txnReadData[s][t*DATA_WIDTH +: DATA_WIDTH];
+                                    threadReadValid[t] <= 1'b1;
                                 end
                             end
                         end
@@ -157,9 +157,9 @@ module warp_mem_unit #(
                     busy <= 1'b0;
                     state <= IDLE;
                     for (t = 0; t < MAX_TRANSACTIONS; t = t + 1) begin
-                        txn_valid[t] <= 1'b0;
+                        txnValid[t] <= 1'b0;
                     end
-                    thread_read_valid <= 0;
+                    threadReadValid <= 0;
                 end
                 default: state <= IDLE;
             endcase

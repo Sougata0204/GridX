@@ -2,28 +2,28 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module stall_tracker #(
+module stallTracker #(
     parameter NUM_WARPS = 1,
     parameter WARP_ID_WIDTH = 2,
     parameter AGE_WIDTH = 16
 ) (
     input wire clk,
     input wire reset,
-    input wire [NUM_WARPS-1:0] warp_active,
-    input wire [NUM_WARPS-1:0] warp_waiting_mem,
-    input wire [NUM_WARPS-1:0] warp_waiting_shared,
-    input wire [NUM_WARPS-1:0] warp_waiting_tensor,
-    input wire [NUM_WARPS-1:0] warp_waiting_dep,
-    input wire issue_valid,
-    input wire [WARP_ID_WIDTH-1:0] issued_warp_id,
-    output reg [2:0] stall_reason [NUM_WARPS-1:0],
-    output reg [AGE_WIDTH-1:0] warp_age [NUM_WARPS-1:0],
-    output wire [WARP_ID_WIDTH-1:0] oldest_ready_warp,
-    output wire oldest_ready_valid,
-    output reg [31:0] perf_stall_cycles_mem,
-    output reg [31:0] perf_stall_cycles_shared,
-    output reg [31:0] perf_stall_cycles_tensor,
-    output reg [31:0] perf_stall_cycles_dep
+    input wire [NUM_WARPS-1:0] warpActive,
+    input wire [NUM_WARPS-1:0] warpWaitingMem,
+    input wire [NUM_WARPS-1:0] warpWaitingShared,
+    input wire [NUM_WARPS-1:0] warpWaitingTensor,
+    input wire [NUM_WARPS-1:0] warpWaitingDep,
+    input wire issueValid,
+    input wire [WARP_ID_WIDTH-1:0] issuedWarpId,
+    output reg [2:0] stallReason [NUM_WARPS-1:0],
+    output reg [AGE_WIDTH-1:0] warpAge [NUM_WARPS-1:0],
+    output wire [WARP_ID_WIDTH-1:0] oldestReadyWarp,
+    output wire oldestReadyValid,
+    output reg [31:0] perfStallCyclesMem,
+    output reg [31:0] perfStallCyclesShared,
+    output reg [31:0] perfStallCyclesTensor,
+    output reg [31:0] perfStallCyclesDep
 );
     localparam READY        = 3'd0;
     localparam WAIT_MEM     = 3'd1;
@@ -34,57 +34,57 @@ module stall_tracker #(
     always @(posedge clk) begin
         if (reset) begin
             for (w = 0; w < NUM_WARPS; w = w + 1) begin
-                stall_reason[w] <= READY;
-                warp_age[w] <= 0;
+                stallReason[w] <= READY;
+                warpAge[w] <= 0;
             end
-            perf_stall_cycles_mem <= 0;
-            perf_stall_cycles_shared <= 0;
-            perf_stall_cycles_tensor <= 0;
-            perf_stall_cycles_dep <= 0;
+            perfStallCyclesMem <= 0;
+            perfStallCyclesShared <= 0;
+            perfStallCyclesTensor <= 0;
+            perfStallCyclesDep <= 0;
         end else begin
             for (w = 0; w < NUM_WARPS; w = w + 1) begin
-                if (!warp_active[w]) begin
-                    stall_reason[w] <= READY;
-                end else if (warp_waiting_mem[w]) begin
-                    stall_reason[w] <= WAIT_MEM;
-                    perf_stall_cycles_mem <= perf_stall_cycles_mem + 1;
-                end else if (warp_waiting_shared[w]) begin
-                    stall_reason[w] <= WAIT_SHARED;
-                    perf_stall_cycles_shared <= perf_stall_cycles_shared + 1;
-                end else if (warp_waiting_tensor[w]) begin
-                    stall_reason[w] <= WAIT_TENSOR;
-                    perf_stall_cycles_tensor <= perf_stall_cycles_tensor + 1;
-                end else if (warp_waiting_dep[w]) begin
-                    stall_reason[w] <= WAIT_DEP;
-                    perf_stall_cycles_dep <= perf_stall_cycles_dep + 1;
+                if (!warpActive[w]) begin
+                    stallReason[w] <= READY;
+                end else if (warpWaitingMem[w]) begin
+                    stallReason[w] <= WAIT_MEM;
+                    perfStallCyclesMem <= perfStallCyclesMem + 1;
+                end else if (warpWaitingShared[w]) begin
+                    stallReason[w] <= WAIT_SHARED;
+                    perfStallCyclesShared <= perfStallCyclesShared + 1;
+                end else if (warpWaitingTensor[w]) begin
+                    stallReason[w] <= WAIT_TENSOR;
+                    perfStallCyclesTensor <= perfStallCyclesTensor + 1;
+                end else if (warpWaitingDep[w]) begin
+                    stallReason[w] <= WAIT_DEP;
+                    perfStallCyclesDep <= perfStallCyclesDep + 1;
                 end else begin
-                    stall_reason[w] <= READY;
+                    stallReason[w] <= READY;
                 end
-                if (issue_valid && issued_warp_id == w[WARP_ID_WIDTH-1:0]) begin
-                    warp_age[w] <= 0;
-                end else if (stall_reason[w] == READY && warp_active[w]) begin
-                    warp_age[w] <= warp_age[w] + 1;
+                if (issueValid && issuedWarpId == w[WARP_ID_WIDTH-1:0]) begin
+                    warpAge[w] <= 0;
+                end else if (stallReason[w] == READY && warpActive[w]) begin
+                    warpAge[w] <= warpAge[w] + 1;
                 end
             end
         end
     end
-    reg [WARP_ID_WIDTH-1:0] oldest_id;
-    reg [AGE_WIDTH-1:0] oldest_age;
-    reg found_ready;
+    reg [WARP_ID_WIDTH-1:0] oldestId;
+    reg [AGE_WIDTH-1:0] oldestAge;
+    reg foundReady;
     always @(*) begin
-        oldest_id = 0;
-        oldest_age = 0;
-        found_ready = 0;
+        oldestId = 0;
+        oldestAge = 0;
+        foundReady = 0;
         for (w = 0; w < NUM_WARPS; w = w + 1) begin
-            if (warp_active[w] && stall_reason[w] == READY) begin
-                if (!found_ready || warp_age[w] > oldest_age) begin
-                    oldest_id = w[WARP_ID_WIDTH-1:0];
-                    oldest_age = warp_age[w];
-                    found_ready = 1;
+            if (warpActive[w] && stallReason[w] == READY) begin
+                if (!foundReady || warpAge[w] > oldestAge) begin
+                    oldestId = w[WARP_ID_WIDTH-1:0];
+                    oldestAge = warpAge[w];
+                    foundReady = 1;
                 end
             end
         end
     end
-    assign oldest_ready_warp = oldest_id;
-    assign oldest_ready_valid = found_ready;
+    assign oldestReadyWarp = oldestId;
+    assign oldestReadyValid = foundReady;
 endmodule

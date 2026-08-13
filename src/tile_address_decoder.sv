@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module tile_address_decoder #(
+module tileAddressDecoder #(
     parameter ADDR_BITS = 8,
     parameter NUM_BANKS = 8,
     parameter BANK_DEPTH = 256,
@@ -11,28 +11,28 @@ module tile_address_decoder #(
 ) (
     input wire clk,
     input wire reset,
-    input wire [ADDR_BITS-1:0] sram_base,
-    input wire [ADDR_BITS-1:0] sram_limit,
+    input wire [ADDR_BITS-1:0] sramBase,
+    input wire [ADDR_BITS-1:0] sramLimit,
     input wire [ADDR_BITS-1:0] address,
-    input wire address_valid,
-    output reg [BANK_BITS-1:0] bank_select,
-    output reg [OFFSET_BITS-1:0] bank_offset,
-    output reg is_sram_access,
-    output reg is_external_access,
-    output reg decode_valid
+    input wire addressValid,
+    output reg [BANK_BITS-1:0] bankSelect,
+    output reg [OFFSET_BITS-1:0] bankOffset,
+    output reg isSramAccess,
+    output reg isExternalAccess,
+    output reg decodeValid
 );
     always @(*) begin
-        is_sram_access = address_valid &&
-                         (address >= sram_base) &&
-                         (address <= sram_limit);
-        is_external_access = address_valid && (address > sram_limit);
-        decode_valid = address_valid;
-        if (is_sram_access) begin
-            bank_select = address[BANK_BITS-1:0];
-            bank_offset = address[ADDR_BITS-1:BANK_BITS];
+        isSramAccess = addressValid &&
+                         (address >= sramBase) &&
+                         (address <= sramLimit);
+        isExternalAccess = addressValid && (address > sramLimit);
+        decodeValid = addressValid;
+        if (isSramAccess) begin
+            bankSelect = address[BANK_BITS-1:0];
+            bankOffset = address[ADDR_BITS-1:BANK_BITS];
         end else begin
-            bank_select = {BANK_BITS{1'b0}};
-            bank_offset = {OFFSET_BITS{1'b0}};
+            bankSelect = {BANK_BITS{1'b0}};
+            bankOffset = {OFFSET_BITS{1'b0}};
         end
     end
 endmodule

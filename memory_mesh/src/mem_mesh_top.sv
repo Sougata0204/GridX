@@ -4,7 +4,7 @@
 import gridx_mem_pkg::*;
 
 module mem_mesh_top (
-    input logic clk,
+    input logic [MESH_Z-1:0] clk_layer,
     input logic rst_n,
 
     input  flit_t   [NUM_NODES-1:0] local_flit_in,
@@ -38,7 +38,7 @@ module mem_mesh_top (
                     assign my_coord.z = z[COORD_Z_W-1:0];
 
                     mem_mesh_router u_router (
-                        .clk            (clk),
+                        .clk            (clk_layer[z]),
                         .rst_n          (rst_n),
                         .my_coord       (my_coord),
                         .flit_in        (node_flit_rx[z][y][x]),
@@ -49,15 +49,18 @@ module mem_mesh_top (
                         .credit_in      (node_credit_rx[z][y][x])
                     );
 
+                    // Local injection/ejection (Core <-> Router)
                     assign node_flit_rx[z][y][x][PORT_LOCAL]       = local_flit_in[NODE_ID];
                     assign node_flit_rx_valid[z][y][x][PORT_LOCAL] = local_flit_in_valid[NODE_ID];
                     assign local_credit_out[NODE_ID]               = node_credit_tx[z][y][x][PORT_LOCAL];
+
                     assign local_flit_out[NODE_ID]                 = node_flit_tx[z][y][x][PORT_LOCAL];
                     assign local_flit_out_valid[NODE_ID]           = node_flit_tx_valid[z][y][x][PORT_LOCAL];
                     assign node_credit_rx[z][y][x][PORT_LOCAL]     = local_credit_in[NODE_ID];
 
+                    // SYNCHRONOUS IN-LAYER LINKS (X and Y Axes)
                     if (x < MESH_X - 1) begin : link_xp
-                        always_ff @(posedge clk or negedge rst_n) begin
+                        always_ff @(posedge clk_layer[z] or negedge rst_n) begin
                             if (!rst_n) begin
                                 node_flit_rx_valid[z][y][x][PORT_X_POS] <= 1'b0;
                                 node_credit_rx[z][y][x][PORT_X_POS]     <= '0;
@@ -73,7 +76,7 @@ module mem_mesh_top (
                     end
 
                     if (x > 0) begin : link_xn
-                        always_ff @(posedge clk or negedge rst_n) begin
+                        always_ff @(posedge clk_layer[z] or negedge rst_n) begin
                             if (!rst_n) begin
                                 node_flit_rx_valid[z][y][x][PORT_X_NEG] <= 1'b0;
                                 node_credit_rx[z][y][x][PORT_X_NEG]     <= '0;
@@ -89,7 +92,7 @@ module mem_mesh_top (
                     end
 
                     if (y < MESH_Y - 1) begin : link_yp
-                        always_ff @(posedge clk or negedge rst_n) begin
+                        always_ff @(posedge clk_layer[z] or negedge rst_n) begin
                             if (!rst_n) begin
                                 node_flit_rx_valid[z][y][x][PORT_Y_POS] <= 1'b0;
                                 node_credit_rx[z][y][x][PORT_Y_POS]     <= '0;
@@ -105,7 +108,7 @@ module mem_mesh_top (
                     end
 
                     if (y > 0) begin : link_yn
-                        always_ff @(posedge clk or negedge rst_n) begin
+                        always_ff @(posedge clk_layer[z] or negedge rst_n) begin
                             if (!rst_n) begin
                                 node_flit_rx_valid[z][y][x][PORT_Y_NEG] <= 1'b0;
                                 node_credit_rx[z][y][x][PORT_Y_NEG]     <= '0;
@@ -120,34 +123,44 @@ module mem_mesh_top (
                         assign node_credit_rx[z][y][x][PORT_Y_NEG]     = '0;
                     end
 
-                    if (z < MESH_Z - 1) begin : link_zp
-                        always_ff @(posedge clk or negedge rst_n) begin
-                            if (!rst_n) begin
-                                node_flit_rx_valid[z][y][x][PORT_Z_POS] <= 1'b0;
-                                node_credit_rx[z][y][x][PORT_Z_POS]     <= '0;
-                            end else begin
-                                node_flit_rx[z][y][x][PORT_Z_POS]       <= node_flit_tx[z+1][y][x][PORT_Z_NEG];
-                                node_flit_rx_valid[z][y][x][PORT_Z_POS] <= node_flit_tx_valid[z+1][y][x][PORT_Z_NEG];
-                                node_credit_rx[z][y][x][PORT_Z_POS]     <= node_credit_tx[z+1][y][x][PORT_Z_NEG];
-                            end
-                        end
+                    // ASYNCHRONOUS CROSS-LAYER LINKS (Z Axis GALS TSV Boundaries)
+                    if (z < MESH_Z - 1) begin : link_zp_gals
+                        // CDC Boundary across ALL Z-layers
+                        // Path: Z -> Z+1
+                        z_link_adapter_uni u_zp_fwd (
+                            .clk_a(clk_layer[z]),
+                            .rst_a_n(rst_n),
+                            .flit_in(node_flit_tx[z][y][x][PORT_Z_POS]),
+                            .flit_in_valid(node_flit_tx_valid[z][y][x][PORT_Z_POS]),
+                            .credit_out(node_credit_rx[z][y][x][PORT_Z_POS]),
+
+                            .clk_b(clk_layer[z+1]),
+                            .rst_b_n(rst_n),
+                            .flit_out(node_flit_rx[z+1][y][x][PORT_Z_NEG]),
+                            .flit_out_valid(node_flit_rx_valid[z+1][y][x][PORT_Z_NEG]),
+                            .credit_in(node_credit_tx[z+1][y][x][PORT_Z_NEG])
+                        );
+
+                        // Path: Z+1 -> Z
+                        z_link_adapter_uni u_zp_rev (
+                            .clk_a(clk_layer[z+1]),
+                            .rst_a_n(rst_n),
+                            .flit_in(node_flit_tx[z+1][y][x][PORT_Z_NEG]),
+                            .flit_in_valid(node_flit_tx_valid[z+1][y][x][PORT_Z_NEG]),
+                            .credit_out(node_credit_rx[z+1][y][x][PORT_Z_NEG]),
+
+                            .clk_b(clk_layer[z]),
+                            .rst_b_n(rst_n),
+                            .flit_out(node_flit_rx[z][y][x][PORT_Z_POS]),
+                            .flit_out_valid(node_flit_rx_valid[z][y][x][PORT_Z_POS]),
+                            .credit_in(node_credit_tx[z][y][x][PORT_Z_POS])
+                        );
                     end else begin : link_zp_tie
                         assign node_flit_rx_valid[z][y][x][PORT_Z_POS] = 1'b0;
                         assign node_credit_rx[z][y][x][PORT_Z_POS]     = '0;
                     end
 
-                    if (z > 0) begin : link_zn
-                        always_ff @(posedge clk or negedge rst_n) begin
-                            if (!rst_n) begin
-                                node_flit_rx_valid[z][y][x][PORT_Z_NEG] <= 1'b0;
-                                node_credit_rx[z][y][x][PORT_Z_NEG]     <= '0;
-                            end else begin
-                                node_flit_rx[z][y][x][PORT_Z_NEG]       <= node_flit_tx[z-1][y][x][PORT_Z_POS];
-                                node_flit_rx_valid[z][y][x][PORT_Z_NEG] <= node_flit_tx_valid[z-1][y][x][PORT_Z_POS];
-                                node_credit_rx[z][y][x][PORT_Z_NEG]     <= node_credit_tx[z-1][y][x][PORT_Z_POS];
-                            end
-                        end
-                    end else begin : link_zn_tie
+                    if (z == 0) begin : link_zn_tie
                         assign node_flit_rx_valid[z][y][x][PORT_Z_NEG] = 1'b0;
                         assign node_credit_rx[z][y][x][PORT_Z_NEG]     = '0;
                     end

@@ -2,14 +2,10 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-// GridX3 - LSU Arbiter
-// Purpose: Fixed-priority arbiter for Load/Store Unit memory requests.
-// Grants access to the lowest-indexed valid requester.
-// Parameters: NUM_REQUESTERS, ADDR_WIDTH, DATA_WIDTH, IS_RESP
-// Architecture: Combinational priority encoder. Lowest index wins.
-// Integration: Instantiated in core.sv for both request and response paths.
+// LSU Arbiter - Round-robin arbiter for Load/Store Unit memory requests.
 
-module lsu_arbiter #(
+
+module lsuArbiter #(
     parameter NUM_REQUESTERS = 4,
     parameter ADDR_WIDTH = 8,
     parameter DATA_WIDTH = 8,
@@ -17,53 +13,76 @@ module lsu_arbiter #(
 ) (
     input wire clk,
     input wire reset,
-    input wire [NUM_REQUESTERS-1:0] request_valid,
-    input wire [NUM_REQUESTERS-1:0] request_write,
-    input wire [ADDR_WIDTH-1:0] request_addr [NUM_REQUESTERS-1:0],
-    input wire [DATA_WIDTH-1:0] request_data [NUM_REQUESTERS-1:0],
-    output reg mem_valid,
-    output reg mem_write,
-    output reg [ADDR_WIDTH-1:0] mem_addr,
-    output reg [DATA_WIDTH-1:0] mem_data,
-    input wire mem_ready,
+    input wire [NUM_REQUESTERS-1:0] requestValid,
+    input wire [NUM_REQUESTERS-1:0] requestWrite,
+    input wire [ADDR_WIDTH-1:0] requestAddr [NUM_REQUESTERS-1:0],
+    input wire [DATA_WIDTH-1:0] requestData [NUM_REQUESTERS-1:0],
+    output reg memValid,
+    output reg memWrite,
+    output reg [ADDR_WIDTH-1:0] memAddr,
+    output reg [DATA_WIDTH-1:0] memData,
+    input wire memReady,
     output reg [NUM_REQUESTERS-1:0] grant
 );
+
+    // Round-robin pointer: starts search from this index
+    reg [$clog2(NUM_REQUESTERS)-1:0] rrPtr;
+
     integer i;
+    reg found;
+
     always @(*) begin
-        mem_valid = 0;
-        mem_write = 0;
-        mem_addr = 0;
-        mem_data = 0;
+        memValid = 0;
+        memWrite = 0;
+        memAddr = 0;
+        memData = 0;
         grant = 0;
+        found = 0;
+
+        // Search starting from rrPtr, wrapping around
         for (i = 0; i < NUM_REQUESTERS; i = i + 1) begin
-            if (request_valid[i]) begin
-                mem_valid = 1;
-                mem_write = request_write[i];
-                mem_addr = request_addr[i];
-                mem_data = request_data[i];
-                if (mem_ready) begin
-                    grant[i] = 1;
+            automatic integer idx = (rrPtr + i) % NUM_REQUESTERS;
+            if (requestValid[idx] && !found) begin
+                memValid = 1;
+                memWrite = requestWrite[idx];
+                memAddr = requestAddr[idx];
+                memData = requestData[idx];
+                if (memReady) begin
+                    grant[idx] = 1;
                 end
-                break;
+                found = 1;
+            end
+        end
+    end
+
+    // Advance round-robin pointer after each grant
+    always @(posedge clk) begin
+        if (reset) begin
+            rrPtr <= 0;
+        end else if (|grant) begin
+            // Move to next requester after the one just granted
+            for (i = 0; i < NUM_REQUESTERS; i = i + 1) begin
+                if (grant[i]) begin
+                    rrPtr <= (i + 1) % NUM_REQUESTERS;
+                end
             end
         end
     end
 
     `ifdef GRIDX_ARB_DEBUG
-    reg [31:0] dbg_cycle_cnt;
+    reg [31:0] dbgCycleCnt;
     always @(posedge clk) begin
         if (reset)
-            dbg_cycle_cnt <= 32'd0;
+            dbgCycleCnt <= 32'd0;
         else
-            dbg_cycle_cnt <= dbg_cycle_cnt + 32'd1;
+            dbgCycleCnt <= dbgCycleCnt + 32'd1;
     end
     always @(posedge clk) begin
-        if (!reset && (dbg_cycle_cnt < 350)) begin
-            $display("[ARB-DEBUG-%0d] Cycle %0d: request_valid=%b mem_ready=%b grant=%b",
-                     IS_RESP, dbg_cycle_cnt, request_valid, mem_ready, grant);
+        if (!reset && (dbgCycleCnt < 350)) begin
+            $display("[ARB-DEBUG-%0d] Cycle %0d: requestValid=%b memReady=%b grant=%b rrPtr=%0d",
+                     IS_RESP, dbgCycleCnt, requestValid, memReady, grant, rrPtr);
         end
     end
     `endif
 
 endmodule
-

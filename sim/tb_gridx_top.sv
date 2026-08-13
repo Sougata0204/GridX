@@ -235,7 +235,6 @@ module tb_gridx_top;
         read_dmem_byte(22'd0);
         $display("    DMEM[0] = 0x%02h", dmem_rd_data);
         // Just verify it's not X (proper driver exists)
-        report(dmem_rd_data === dmem_rd_data, "dmem_rd_data is not X");
 
         // TEST 5: Multi-Block Dispatch (8 threads = 2 blocks)
         test_num = 5;

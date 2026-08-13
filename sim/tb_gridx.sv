@@ -117,11 +117,8 @@ module tb_gridx;
     initial begin
         $dumpfile("wave/tb_gridx.vcd");
         $dumpvars(0, tb_gridx);
-        $display("================================================================");
-        $display(" GridX EXECUTION SANITY TESTBENCH (iverilog)");
-        $display("================================================================");
-        $display("  Thread Count:  %0d", THREAD_COUNT);
-        $display("  Max Cycles:    %0d", MAX_SIM_CYCLES);
+        $display("[TB_GRIDX] GridX Execution Sanity Testbench");
+        $display("[TB_GRIDX] Thread Count: %0d | Max Cycles: %0d", THREAD_COUNT, MAX_SIM_CYCLES);
 
         cycle_count = 0;
         done_cycle = -1;
@@ -168,22 +165,15 @@ module tb_gridx;
             end
         end
 
-        $display("");
-        $display("================================================================");
-        $display("                   EXECUTION RESULTS");
-        $display("================================================================");
-        $display("  Total cycles:  %0d", cycle_count);
-        $display("  Done seen:     %s", done_seen ? "YES" : "NO");
-        $display("  Done cycle:    %0d", done_cycle);
+        $display("[TB_GRIDX] Total cycles: %0d | Done seen: %s | Done cycle: %0d", cycle_count, done_seen ? "YES" : "NO", done_cycle);
 
         if (done_seen && (done_cycle > 10) && (cycle_count > 0)) begin
-            $display("  [PASS] Execution Sanity Test PASSED");
+            $display("[TB_GRIDX] RESULT: Execution Sanity Test PASSED");
         end else begin
-            $display("  [FAIL] Execution Sanity Test FAILED");
+            $display("[TB_GRIDX] RESULT: Execution Sanity Test FAILED");
             if (!done_seen) $display("    - Done never asserted (timeout)");
             if (done_cycle <= 10) $display("    - Done during/after reset");
         end
-        $display("================================================================");
         $finish;
     end
 endmodule

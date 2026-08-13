@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module prefetch_engine #(
+module prefetchEngine #(
     parameter ADDR_WIDTH   = 22,
     parameter DATA_WIDTH   = 8,
     parameter NUM_ENTRIES  = 8,
@@ -11,146 +11,146 @@ module prefetch_engine #(
     input  wire clk,
     input  wire reset,
 
-    input  wire                    lsu_load_valid,
-    input  wire [ADDR_WIDTH-1:0]   lsu_load_addr,
+    input  wire                    lsuLoadValid,
+    input  wire [ADDR_WIDTH-1:0]   lsuLoadAddr,
 
-    output reg                     pf_req_valid,
-    output reg  [ADDR_WIDTH-1:0]   pf_req_addr,
-    input  wire                    pf_req_ready,
+    output reg                     pfReqValid,
+    output reg  [ADDR_WIDTH-1:0]   pfReqAddr,
+    input  wire                    pfReqReady,
 
-    output wire [3:0]              active_streams,
-    output reg  [15:0]             pf_issued_count,
-    output reg  [15:0]             pf_hit_count
+    output wire [3:0]              activeStreams,
+    output reg  [15:0]             pfIssuedCount,
+    output reg  [15:0]             pfHitCount
 );
 
-    reg                    entry_valid   [NUM_ENTRIES-1:0];
-    reg [ADDR_WIDTH-1:0]   entry_last    [NUM_ENTRIES-1:0];
-    reg signed [ADDR_WIDTH-1:0] entry_stride [NUM_ENTRIES-1:0];
-    reg [3:0]              entry_conf    [NUM_ENTRIES-1:0];
-    reg [ADDR_WIDTH-1:0]   entry_pf_addr [NUM_ENTRIES-1:0];
+    reg                    entryValid   [NUM_ENTRIES-1:0];
+    reg [ADDR_WIDTH-1:0]   entryLast    [NUM_ENTRIES-1:0];
+    reg signed [ADDR_WIDTH-1:0] entryStride [NUM_ENTRIES-1:0];
+    reg [3:0]              entryConf    [NUM_ENTRIES-1:0];
+    reg [ADDR_WIDTH-1:0]   entryPfAddr [NUM_ENTRIES-1:0];
 
-    reg [3:0] active_cnt;
-    assign active_streams = active_cnt;
+    reg [3:0] activeCnt;
+    assign activeStreams = activeCnt;
 
     integer i;
-    reg [3:0] temp_active;
+    reg [3:0] tempActive;
 
-    reg [$clog2(NUM_ENTRIES)-1:0] match_idx;
-    reg                           match_found;
-    reg signed [ADDR_WIDTH-1:0]   observed_stride;
+    reg [$clog2(NUM_ENTRIES)-1:0] matchIdx;
+    reg                           matchFound;
+    reg signed [ADDR_WIDTH-1:0]   observedStride;
 
     always @(*) begin
-        match_found = 0;
-        match_idx = 0;
-        observed_stride = 0;
+        matchFound = 0;
+        matchIdx = 0;
+        observedStride = 0;
         for (i = NUM_ENTRIES-1; i >= 0; i = i - 1) begin
-            if (entry_valid[i]) begin
+            if (entryValid[i]) begin
 
-                if (lsu_load_addr >= entry_last[i]) begin
-                    if ((lsu_load_addr - entry_last[i]) < 256) begin
-                        match_found = 1;
-                        match_idx = i;
-                        observed_stride = lsu_load_addr - entry_last[i];
+                if (lsuLoadAddr >= entryLast[i]) begin
+                    if ((lsuLoadAddr - entryLast[i]) < 256) begin
+                        matchFound = 1;
+                        matchIdx = i;
+                        observedStride = lsuLoadAddr - entryLast[i];
                     end
                 end else begin
-                    if ((entry_last[i] - lsu_load_addr) < 256) begin
-                        match_found = 1;
-                        match_idx = i;
-                        observed_stride = -$signed(entry_last[i] - lsu_load_addr);
+                    if ((entryLast[i] - lsuLoadAddr) < 256) begin
+                        matchFound = 1;
+                        matchIdx = i;
+                        observedStride = -$signed(entryLast[i] - lsuLoadAddr);
                     end
                 end
             end
         end
     end
 
-    reg [$clog2(NUM_ENTRIES)-1:0] free_idx;
+    reg [$clog2(NUM_ENTRIES)-1:0] freeIdx;
     always @(*) begin
-        free_idx = 0;
+        freeIdx = 0;
         for (i = NUM_ENTRIES-1; i >= 0; i = i - 1) begin
-            if (!entry_valid[i]) free_idx = i;
-            else if (entry_conf[i] < entry_conf[free_idx]) free_idx = i;
+            if (!entryValid[i]) freeIdx = i;
+            else if (entryConf[i] < entryConf[freeIdx]) freeIdx = i;
         end
     end
 
-    reg [$clog2(NUM_ENTRIES)-1:0] pf_rr;
-    reg pf_pending;
-    reg [ADDR_WIDTH-1:0] pf_pending_addr;
+    reg [$clog2(NUM_ENTRIES)-1:0] pfRr;
+    reg pfPending;
+    reg [ADDR_WIDTH-1:0] pfPendingAddr;
 
     always @(posedge clk) begin
         if (reset) begin
-            pf_req_valid <= 0;
-            pf_issued_count <= 0;
-            pf_hit_count <= 0;
-            pf_pending <= 0;
-            pf_rr <= 0;
-            active_cnt <= 0;
+            pfReqValid <= 0;
+            pfIssuedCount <= 0;
+            pfHitCount <= 0;
+            pfPending <= 0;
+            pfRr <= 0;
+            activeCnt <= 0;
             for (i = 0; i < NUM_ENTRIES; i = i + 1) begin
-                entry_valid[i]   <= 0;
-                entry_last[i]    <= 0;
-                entry_stride[i]  <= 0;
-                entry_conf[i]    <= 0;
-                entry_pf_addr[i] <= 0;
+                entryValid[i]   <= 0;
+                entryLast[i]    <= 0;
+                entryStride[i]  <= 0;
+                entryConf[i]    <= 0;
+                entryPfAddr[i] <= 0;
             end
         end else begin
-            pf_req_valid <= 0;
+            pfReqValid <= 0;
 
-            if (lsu_load_valid) begin
-                if (match_found) begin
+            if (lsuLoadValid) begin
+                if (matchFound) begin
 
-                    entry_last[match_idx] <= lsu_load_addr;
-                    if (observed_stride == entry_stride[match_idx]) begin
+                    entryLast[matchIdx] <= lsuLoadAddr;
+                    if (observedStride == entryStride[matchIdx]) begin
 
-                        if (entry_conf[match_idx] < 15)
-                            entry_conf[match_idx] <= entry_conf[match_idx] + 1;
+                        if (entryConf[matchIdx] < 15)
+                            entryConf[matchIdx] <= entryConf[matchIdx] + 1;
 
-                        entry_pf_addr[match_idx] <= lsu_load_addr +
-                            (entry_stride[match_idx] * PREFETCH_DIST);
+                        entryPfAddr[matchIdx] <= lsuLoadAddr +
+                            (entryStride[matchIdx] * PREFETCH_DIST);
                     end else begin
 
-                        entry_stride[match_idx] <= observed_stride;
-                        entry_conf[match_idx] <= 1;
+                        entryStride[matchIdx] <= observedStride;
+                        entryConf[matchIdx] <= 1;
                     end
 
-                    if (lsu_load_addr == entry_pf_addr[match_idx])
-                        pf_hit_count <= pf_hit_count + 1;
+                    if (lsuLoadAddr == entryPfAddr[matchIdx])
+                        pfHitCount <= pfHitCount + 1;
                 end else begin
 
-                    entry_valid[free_idx]   <= 1;
-                    entry_last[free_idx]    <= lsu_load_addr;
-                    entry_stride[free_idx]  <= 0;
-                    entry_conf[free_idx]    <= 0;
-                    entry_pf_addr[free_idx] <= 0;
+                    entryValid[freeIdx]   <= 1;
+                    entryLast[freeIdx]    <= lsuLoadAddr;
+                    entryStride[freeIdx]  <= 0;
+                    entryConf[freeIdx]    <= 0;
+                    entryPfAddr[freeIdx] <= 0;
                 end
             end
 
-            if (!pf_pending) begin
+            if (!pfPending) begin
                 for (i = 0; i < NUM_ENTRIES; i = i + 1) begin
-                    if (entry_valid[(pf_rr + i) % NUM_ENTRIES] &&
-                        entry_conf[(pf_rr + i) % NUM_ENTRIES] >= 4 &&
-                        entry_pf_addr[(pf_rr + i) % NUM_ENTRIES] != 0 &&
-                        !pf_pending) begin
-                        pf_pending <= 1;
-                        pf_pending_addr <= entry_pf_addr[(pf_rr + i) % NUM_ENTRIES];
-                        pf_rr <= ((pf_rr + i + 1) % NUM_ENTRIES);
+                    if (entryValid[(pfRr + i) % NUM_ENTRIES] &&
+                        entryConf[(pfRr + i) % NUM_ENTRIES] >= 4 &&
+                        entryPfAddr[(pfRr + i) % NUM_ENTRIES] != 0 &&
+                        !pfPending) begin
+                        pfPending <= 1;
+                        pfPendingAddr <= entryPfAddr[(pfRr + i) % NUM_ENTRIES];
+                        pfRr <= ((pfRr + i + 1) % NUM_ENTRIES);
                     end
                 end
             end
 
-            if (pf_pending) begin
-                pf_req_valid <= 1;
-                pf_req_addr  <= pf_pending_addr;
-                if (pf_req_ready) begin
-                    pf_pending <= 0;
-                    pf_issued_count <= pf_issued_count + 1;
+            if (pfPending) begin
+                pfReqValid <= 1;
+                pfReqAddr  <= pfPendingAddr;
+                if (pfReqReady) begin
+                    pfPending <= 0;
+                    pfIssuedCount <= pfIssuedCount + 1;
                 end
             end
 
-            temp_active = 0;
+            tempActive = 0;
             for (i = 0; i < NUM_ENTRIES; i = i + 1) begin
-                if (entry_valid[i] && entry_conf[i] >= 4)
-                    temp_active = temp_active + 1;
+                if (entryValid[i] && entryConf[i] >= 4)
+                    tempActive = tempActive + 1;
             end
-            active_cnt <= temp_active;
+            activeCnt <= tempActive;
         end
     end
 

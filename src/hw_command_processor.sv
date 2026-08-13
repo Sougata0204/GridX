@@ -4,7 +4,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module hw_command_processor #(
+module hwCommandProcessor #(
     parameter MAX_TASKS = 32,
     parameter MAX_DEPS = 4,
     parameter CMD_WIDTH = 128,
@@ -14,71 +14,71 @@ module hw_command_processor #(
     input  wire reset,
     
     // Host Submission Interface
-    input  wire submit_valid,
-    input  wire [TASK_ID_WIDTH-1:0] submit_task_id,
-    input  wire [CMD_WIDTH-1:0] submit_cmd,
-    input  wire [2:0] submit_dep_count,
-    input  wire [(MAX_DEPS*TASK_ID_WIDTH)-1:0] submit_dep_ids,
-    output reg  submit_ready,
+    input  wire submitValid,
+    input  wire [TASK_ID_WIDTH-1:0] submitTaskId,
+    input  wire [CMD_WIDTH-1:0] submitCmd,
+    input  wire [2:0] submitDepCount,
+    input  wire [(MAX_DEPS*TASK_ID_WIDTH)-1:0] submitDepIds,
+    output reg  submitReady,
     
     // Command Launch Interface (to Cores/NMC)
-    output reg  launch_valid,
-    output reg  [TASK_ID_WIDTH-1:0] launch_task_id,
-    output reg  [CMD_WIDTH-1:0] launch_cmd,
-    input  wire launch_ack,
+    output reg  launchValid,
+    output reg  [TASK_ID_WIDTH-1:0] launchTaskId,
+    output reg  [CMD_WIDTH-1:0] launchCmd,
+    input  wire launchAck,
     
     // Completion Interface (from Cores/NMC)
-    input  wire complete_valid,
-    input  wire [TASK_ID_WIDTH-1:0] complete_task_id,
+    input  wire completeValid,
+    input  wire [TASK_ID_WIDTH-1:0] completeTaskId,
     
     // Status
     output wire busy,
-    output wire [31:0] tasks_pending,
-    output wire [31:0] tasks_completed,
-    output wire graph_done
+    output wire [31:0] tasksPending,
+    output wire [31:0] tasksCompleted,
+    output wire graphDone
 );
 
-    reg valid_task [MAX_TASKS-1:0];
-    reg [CMD_WIDTH-1:0] cmd_array [MAX_TASKS-1:0];
-    reg [MAX_TASKS-1:0] dep_matrix [MAX_TASKS-1:0]; // dep_matrix[i][j] = 1 means task i depends on task j
-    reg [MAX_TASKS-1:0] completed_mask; // 1 means task is complete
-    reg [MAX_TASKS-1:0] launched_mask;  // 1 means task has been sent for execution
+    reg validTask [MAX_TASKS-1:0];
+    reg [CMD_WIDTH-1:0] cmdArray [MAX_TASKS-1:0];
+    reg [MAX_TASKS-1:0] depMatrix [MAX_TASKS-1:0]; // depMatrix[i][j] = 1 means task i depends on task j
+    reg [MAX_TASKS-1:0] completedMask; // 1 means task is complete
+    reg [MAX_TASKS-1:0] launchedMask;  // 1 means task has been sent for execution
     
-    reg [31:0] pending_cnt;
-    reg [31:0] comp_cnt;
+    reg [31:0] pendingCnt;
+    reg [31:0] compCnt;
     
-    assign tasks_pending = pending_cnt;
-    assign tasks_completed = comp_cnt;
-    assign busy = (pending_cnt > 0);
-    assign graph_done = (pending_cnt == 0 && comp_cnt > 0);
+    assign tasksPending = pendingCnt;
+    assign tasksCompleted = compCnt;
+    assign busy = (pendingCnt > 0);
+    assign graphDone = (pendingCnt == 0 && compCnt > 0);
     
     integer i, j;
     
     // Find ready tasks
-    reg [MAX_TASKS-1:0] ready_mask;
+    reg [MAX_TASKS-1:0] readyMask;
     always @(*) begin
-        ready_mask = 0;
+        readyMask = 0;
         for (i = 0; i < MAX_TASKS; i = i + 1) begin
-            if (valid_task[i] && !launched_mask[i] && !completed_mask[i]) begin
-                // A task is ready if all its dependencies are met (i.e. all dependencies are 1 in completed_mask or 0 in dep_matrix)
-                if ((dep_matrix[i] & ~completed_mask) == 0) begin
-                    ready_mask[i] = 1;
+            if (validTask[i] && !launchedMask[i] && !completedMask[i]) begin
+                // A task is ready if all its dependencies are met (i.e. all dependencies are 1 in completedMask or 0 in depMatrix)
+                if ((depMatrix[i] & ~completedMask) == 0) begin
+                    readyMask[i] = 1;
                 end
             end
         end
     end
     
     // Arbitrate among ready tasks
-    reg [$clog2(MAX_TASKS)-1:0] next_launch_id;
-    reg next_launch_valid;
+    reg [$clog2(MAX_TASKS)-1:0] nextLaunchId;
+    reg nextLaunchValid;
     
     always @(*) begin
-        next_launch_id = 0;
-        next_launch_valid = 0;
+        nextLaunchId = 0;
+        nextLaunchValid = 0;
         for (i = 0; i < MAX_TASKS; i = i + 1) begin
-            if (ready_mask[i] && !next_launch_valid) begin
-                next_launch_valid = 1;
-                next_launch_id = i;
+            if (readyMask[i] && !nextLaunchValid) begin
+                nextLaunchValid = 1;
+                nextLaunchId = i;
             end
         end
     end
@@ -86,56 +86,56 @@ module hw_command_processor #(
     always @(posedge clk) begin
         if (reset) begin
             for (i = 0; i < MAX_TASKS; i = i + 1) begin
-                valid_task[i] <= 0;
-                dep_matrix[i] <= 0;
+                validTask[i] <= 0;
+                depMatrix[i] <= 0;
             end
-            completed_mask <= 0;
-            launched_mask <= 0;
-            pending_cnt <= 0;
-            comp_cnt <= 0;
+            completedMask <= 0;
+            launchedMask <= 0;
+            pendingCnt <= 0;
+            compCnt <= 0;
             
-            submit_ready <= 1;
-            launch_valid <= 0;
-            launch_task_id <= 0;
-            launch_cmd <= 0;
+            submitReady <= 1;
+            launchValid <= 0;
+            launchTaskId <= 0;
+            launchCmd <= 0;
         end else begin
-            submit_ready <= 1; // Can always submit if there are open slots (simplified)
+            submitReady <= 1; // Can always submit if there are open slots (simplified)
             
             // 1. Process Submission
-            if (submit_valid) begin
-                valid_task[submit_task_id] <= 1;
-                cmd_array[submit_task_id] <= submit_cmd;
+            if (submitValid) begin
+                validTask[submitTaskId] <= 1;
+                cmdArray[submitTaskId] <= submitCmd;
                 
                 // Build dependency mask
-                for (j = 0; j < MAX_TASKS; j = j + 1) dep_matrix[submit_task_id][j] <= 0;
+                for (j = 0; j < MAX_TASKS; j = j + 1) depMatrix[submitTaskId][j] <= 0;
                 
                 for (j = 0; j < MAX_DEPS; j = j + 1) begin
-                    if (j < submit_dep_count) begin
-                        dep_matrix[submit_task_id][ submit_dep_ids[(j*TASK_ID_WIDTH) +: TASK_ID_WIDTH] ] <= 1;
+                    if (j < submitDepCount) begin
+                        depMatrix[submitTaskId][ submitDepIds[(j*TASK_ID_WIDTH) +: TASK_ID_WIDTH] ] <= 1;
                     end
                 end
                 
-                completed_mask[submit_task_id] <= 0;
-                launched_mask[submit_task_id] <= 0;
-                pending_cnt <= pending_cnt + 1;
+                completedMask[submitTaskId] <= 0;
+                launchedMask[submitTaskId] <= 0;
+                pendingCnt <= pendingCnt + 1;
             end
             
             // 2. Process Completion
-            if (complete_valid) begin
-                completed_mask[complete_task_id] <= 1;
-                pending_cnt <= pending_cnt - 1;
-                comp_cnt <= comp_cnt + 1;
-                valid_task[complete_task_id] <= 0; // Free slot
+            if (completeValid) begin
+                completedMask[completeTaskId] <= 1;
+                pendingCnt <= pendingCnt - 1;
+                compCnt <= compCnt + 1;
+                validTask[completeTaskId] <= 0; // Free slot
             end
             
             // 3. Launching
-            if (launch_valid && launch_ack) begin
-                launch_valid <= 0; // Launched
-                launched_mask[launch_task_id] <= 1;
-            end else if (!launch_valid && next_launch_valid) begin
-                launch_valid <= 1;
-                launch_task_id <= next_launch_id;
-                launch_cmd <= cmd_array[next_launch_id];
+            if (launchValid && launchAck) begin
+                launchValid <= 0; // Launched
+                launchedMask[launchTaskId] <= 1;
+            end else if (!launchValid && nextLaunchValid) begin
+                launchValid <= 1;
+                launchTaskId <= nextLaunchId;
+                launchCmd <= cmdArray[nextLaunchId];
             end
         end
     end

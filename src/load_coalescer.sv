@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module load_coalescer #(
+module loadCoalescer #(
     parameter LANES = 4,
     parameter ADDR_WIDTH = 16,
     parameter DATA_WIDTH = 16,
@@ -10,118 +10,118 @@ module load_coalescer #(
 ) (
     input wire clk,
     input wire reset,
-    input wire [LANES-1:0] lane_valid,
-    input wire [ADDR_WIDTH-1:0] lane_addr [LANES-1:0],
-    input wire lane_read_enable,
-    output reg coalesced_req_valid,
-    output reg [ADDR_WIDTH-1:0] coalesced_req_addr,
-    output reg [4:0] coalesced_req_count,
-    output reg [LANES-1:0] coalesced_lane_mask,
-    input wire coalesced_req_ready,
-    input wire resp_valid,
-    input wire [DATA_WIDTH*LANES-1:0] resp_data,
-    output reg [LANES-1:0] lane_resp_valid,
-    output reg [DATA_WIDTH-1:0] lane_resp_data [LANES-1:0],
-    output reg [31:0] perf_coalesced_requests,
-    output reg [31:0] perf_uncoalesced_requests,
-    output reg [31:0] perf_bytes_saved
+    input wire [LANES-1:0] laneValid,
+    input wire [ADDR_WIDTH-1:0] laneAddr [LANES-1:0],
+    input wire laneReadEnable,
+    output reg coalescedReqValid,
+    output reg [ADDR_WIDTH-1:0] coalescedReqAddr,
+    output reg [4:0] coalescedReqCount,
+    output reg [LANES-1:0] coalescedLaneMask,
+    input wire coalescedReqReady,
+    input wire respValid,
+    input wire [DATA_WIDTH*LANES-1:0] respData,
+    output reg [LANES-1:0] laneRespValid,
+    output reg [DATA_WIDTH-1:0] laneRespData [LANES-1:0],
+    output reg [31:0] perfCoalescedRequests,
+    output reg [31:0] perfUncoalescedRequests,
+    output reg [31:0] perfBytesSaved
 );
     localparam IDLE = 2'b00;
     localparam ANALYZE = 2'b01;
     localparam REQUEST = 2'b10;
     localparam RESPONSE = 2'b11;
     reg [1:0] state;
-    wire [ADDR_WIDTH-1:0] sorted_addr [LANES-1:0];
-    wire [3:0] sorted_lane_id [LANES-1:0];
-    reg [LANES-1:0] active_lanes;
-    reg [ADDR_WIDTH-1:0] base_addr;
-    reg [4:0] contiguous_count;
+    wire [ADDR_WIDTH-1:0] sortedAddr [LANES-1:0];
+    wire [3:0] sortedLaneId [LANES-1:0];
+    reg [LANES-1:0] activeLanes;
+    reg [ADDR_WIDTH-1:0] baseAddr;
+    reg [4:0] contiguousCount;
     integer i, j;
-    reg [ADDR_WIDTH-1:0] min_addr;
-    reg [3:0] min_lane;
-    reg [LANES-1:0] remaining_lanes;
+    reg [ADDR_WIDTH-1:0] minAddr;
+    reg [3:0] minLane;
+    reg [LANES-1:0] remainingLanes;
     always @(*) begin
-        contiguous_count = 0;
-        base_addr = 16'hFFFF;
-        active_lanes = 0;
-        min_addr = 16'hFFFF;
-        min_lane = 0;
-        remaining_lanes = 0;
-        if (lane_read_enable && |lane_valid) begin
+        contiguousCount = 0;
+        baseAddr = 16'hFFFF;
+        activeLanes = 0;
+        minAddr = 16'hFFFF;
+        minLane = 0;
+        remainingLanes = 0;
+        if (laneReadEnable && |laneValid) begin
             for (i = 0; i < LANES; i = i + 1) begin
-                if (lane_valid[i] && lane_addr[i] < min_addr) begin
-                    min_addr = lane_addr[i];
-                    min_lane = i[3:0];
+                if (laneValid[i] && laneAddr[i] < minAddr) begin
+                    minAddr = laneAddr[i];
+                    minLane = i[3:0];
                 end
             end
-            base_addr = min_addr;
-            remaining_lanes = lane_valid;
+            baseAddr = minAddr;
+            remainingLanes = laneValid;
             for (j = 0; j < LANES; j = j + 1) begin
                 for (i = 0; i < LANES; i = i + 1) begin
-                    if (remaining_lanes[i] && (lane_addr[i] == base_addr + j)) begin
-                        active_lanes[i] = 1;
-                        contiguous_count = contiguous_count + 1;
-                        remaining_lanes[i] = 0;
+                    if (remainingLanes[i] && (laneAddr[i] == baseAddr + j)) begin
+                        activeLanes[i] = 1;
+                        contiguousCount = contiguousCount + 1;
+                        remainingLanes[i] = 0;
                     end
                 end
             end
         end
     end
-    reg [LANES-1:0] pending_lanes;
-    reg [ADDR_WIDTH-1:0] pending_base;
-    reg [4:0] pending_count;
+    reg [LANES-1:0] pendingLanes;
+    reg [ADDR_WIDTH-1:0] pendingBase;
+    reg [4:0] pendingCount;
     always @(posedge clk) begin
         if (reset) begin
             state <= IDLE;
-            coalesced_req_valid <= 0;
-            coalesced_req_addr <= 0;
-            coalesced_req_count <= 0;
-            coalesced_lane_mask <= 0;
-            lane_resp_valid <= 0;
-            perf_coalesced_requests <= 0;
-            perf_uncoalesced_requests <= 0;
-            perf_bytes_saved <= 0;
-            pending_lanes <= 0;
-            pending_base <= 0;
-            pending_count <= 0;
-            for (i = 0; i < LANES; i = i + 1) lane_resp_data[i] <= 0;
+            coalescedReqValid <= 0;
+            coalescedReqAddr <= 0;
+            coalescedReqCount <= 0;
+            coalescedLaneMask <= 0;
+            laneRespValid <= 0;
+            perfCoalescedRequests <= 0;
+            perfUncoalescedRequests <= 0;
+            perfBytesSaved <= 0;
+            pendingLanes <= 0;
+            pendingBase <= 0;
+            pendingCount <= 0;
+            for (i = 0; i < LANES; i = i + 1) laneRespData[i] <= 0;
         end else begin
-            lane_resp_valid <= 0;
+            laneRespValid <= 0;
             case (state)
                 IDLE: begin
-                    coalesced_req_valid <= 0;
-                    if (lane_read_enable && |lane_valid) begin
+                    coalescedReqValid <= 0;
+                    if (laneReadEnable && |laneValid) begin
                         state <= ANALYZE;
                     end
                 end
                 ANALYZE: begin
-                    pending_lanes <= active_lanes;
-                    pending_base <= base_addr;
-                    pending_count <= contiguous_count;
-                    coalesced_req_valid <= 1;
-                    coalesced_req_addr <= base_addr;
-                    coalesced_req_count <= contiguous_count;
-                    coalesced_lane_mask <= active_lanes;
+                    pendingLanes <= activeLanes;
+                    pendingBase <= baseAddr;
+                    pendingCount <= contiguousCount;
+                    coalescedReqValid <= 1;
+                    coalescedReqAddr <= baseAddr;
+                    coalescedReqCount <= contiguousCount;
+                    coalescedLaneMask <= activeLanes;
                     state <= REQUEST;
-                    if (contiguous_count > 1) begin
-                        perf_coalesced_requests <= perf_coalesced_requests + 1;
-                        perf_bytes_saved <= perf_bytes_saved + ((contiguous_count - 1) * DATA_WIDTH / 8);
+                    if (contiguousCount > 1) begin
+                        perfCoalescedRequests <= perfCoalescedRequests + 1;
+                        perfBytesSaved <= perfBytesSaved + ((contiguousCount - 1) * DATA_WIDTH / 8);
                     end else begin
-                        perf_uncoalesced_requests <= perf_uncoalesced_requests + 1;
+                        perfUncoalescedRequests <= perfUncoalescedRequests + 1;
                     end
                 end
                 REQUEST: begin
-                    if (coalesced_req_ready) begin
-                        coalesced_req_valid <= 0;
+                    if (coalescedReqReady) begin
+                        coalescedReqValid <= 0;
                         state <= RESPONSE;
                     end
                 end
                 RESPONSE: begin
-                    if (resp_valid) begin
+                    if (respValid) begin
                         for (i = 0; i < LANES; i = i + 1) begin
-                            if (pending_lanes[i]) begin
-                                lane_resp_valid[i] <= 1;
-                                lane_resp_data[i] <= resp_data[(lane_addr[i] - pending_base) * DATA_WIDTH +: DATA_WIDTH];
+                            if (pendingLanes[i]) begin
+                                laneRespValid[i] <= 1;
+                                laneRespData[i] <= respData[(laneAddr[i] - pendingBase) * DATA_WIDTH +: DATA_WIDTH];
                             end
                         end
                         state <= IDLE;

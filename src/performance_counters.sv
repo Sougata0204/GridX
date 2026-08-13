@@ -2,7 +2,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-module performance_counters #(
+module performanceCounters #(
     parameter NUM_CORES = 8,
     parameter WARPS_PER_CORE = 1,
     parameter COUNTER_WIDTH = 48
@@ -11,51 +11,51 @@ module performance_counters #(
     input wire reset,
     input wire enable,
     input wire clear,
-    input wire [NUM_CORES-1:0] core_active,
-    input wire [NUM_CORES-1:0] core_stalled,
-    input wire [NUM_CORES-1:0] instr_issued,
-    input wire [NUM_CORES-1:0] instr_retired,
-    input wire [NUM_CORES-1:0] l1_read_hit,
-    input wire [NUM_CORES-1:0] l1_write_hit,
-    input wire [NUM_CORES-1:0] l2_read_hit,
-    input wire [NUM_CORES-1:0] l2_write_hit,
-    input wire [NUM_CORES-1:0] shared_mem_hit,
-    input wire [NUM_CORES-1:0] shared_mem_conflict,
-    input wire [NUM_CORES-1:0] external_mem_access,
-    input wire [NUM_CORES-1:0] l3_access,
-    input wire [NUM_CORES-1:0] stall_mem,
-    input wire [NUM_CORES-1:0] stall_tensor,
-    input wire [NUM_CORES-1:0] stall_reg_hazard,
-    input wire [NUM_CORES-1:0] stall_structural,
-    input wire [NUM_CORES-1:0] tensor_op_start,
-    input wire [NUM_CORES-1:0] tensor_op_complete,
-    input wire [NUM_CORES-1:0] core_clock_gated,
-    input wire [NUM_CORES-1:0] core_power_gated,
-    output reg [COUNTER_WIDTH-1:0] cycle_count,
-    output reg [COUNTER_WIDTH-1:0] total_issued,
-    output reg [COUNTER_WIDTH-1:0] total_retired,
-    output reg [COUNTER_WIDTH-1:0] l1_read_hits,
-    output reg [COUNTER_WIDTH-1:0] l1_write_hits,
-    output reg [COUNTER_WIDTH-1:0] l2_read_hits,
-    output reg [COUNTER_WIDTH-1:0] l2_write_hits,
-    output reg [COUNTER_WIDTH-1:0] shared_mem_hits,
-    output reg [COUNTER_WIDTH-1:0] shared_mem_conflicts,
-    output reg [COUNTER_WIDTH-1:0] external_mem_accesses,
-    output reg [COUNTER_WIDTH-1:0] l3_accesses,
-    output reg [COUNTER_WIDTH-1:0] stall_cycles_mem,
-    output reg [COUNTER_WIDTH-1:0] stall_cycles_tensor,
-    output reg [COUNTER_WIDTH-1:0] stall_cycles_reg,
-    output reg [COUNTER_WIDTH-1:0] stall_cycles_structural,
-    output reg [COUNTER_WIDTH-1:0] tensor_ops_started,
-    output reg [COUNTER_WIDTH-1:0] tensor_ops_completed,
-    output reg [COUNTER_WIDTH-1:0] clock_gated_cycles,
-    output reg [COUNTER_WIDTH-1:0] power_gated_cycles,
-    output reg [15:0] core_utilization,
+    input wire [NUM_CORES-1:0] coreActive,
+    input wire [NUM_CORES-1:0] coreStalled,
+    input wire [NUM_CORES-1:0] instrIssued,
+    input wire [NUM_CORES-1:0] instrRetired,
+    input wire [NUM_CORES-1:0] l1ReadHit,
+    input wire [NUM_CORES-1:0] l1WriteHit,
+    input wire [NUM_CORES-1:0] l2ReadHit,
+    input wire [NUM_CORES-1:0] l2WriteHit,
+    input wire [NUM_CORES-1:0] sharedMemHit,
+    input wire [NUM_CORES-1:0] sharedMemConflict,
+    input wire [NUM_CORES-1:0] externalMemAccess,
+    input wire [NUM_CORES-1:0] l3Access,
+    input wire [NUM_CORES-1:0] stallMem,
+    input wire [NUM_CORES-1:0] stallTensor,
+    input wire [NUM_CORES-1:0] stallRegHazard,
+    input wire [NUM_CORES-1:0] stallStructural,
+    input wire [NUM_CORES-1:0] tensorOpStart,
+    input wire [NUM_CORES-1:0] tensorOpComplete,
+    input wire [NUM_CORES-1:0] coreClockGated,
+    input wire [NUM_CORES-1:0] corePowerGated,
+    output reg [COUNTER_WIDTH-1:0] cycleCount,
+    output reg [COUNTER_WIDTH-1:0] totalIssued,
+    output reg [COUNTER_WIDTH-1:0] totalRetired,
+    output reg [COUNTER_WIDTH-1:0] l1ReadHits,
+    output reg [COUNTER_WIDTH-1:0] l1WriteHits,
+    output reg [COUNTER_WIDTH-1:0] l2ReadHits,
+    output reg [COUNTER_WIDTH-1:0] l2WriteHits,
+    output reg [COUNTER_WIDTH-1:0] sharedMemHits,
+    output reg [COUNTER_WIDTH-1:0] sharedMemConflicts,
+    output reg [COUNTER_WIDTH-1:0] externalMemAccesses,
+    output reg [COUNTER_WIDTH-1:0] l3Accesses,
+    output reg [COUNTER_WIDTH-1:0] stallCyclesMem,
+    output reg [COUNTER_WIDTH-1:0] stallCyclesTensor,
+    output reg [COUNTER_WIDTH-1:0] stallCyclesReg,
+    output reg [COUNTER_WIDTH-1:0] stallCyclesStructural,
+    output reg [COUNTER_WIDTH-1:0] tensorOpsStarted,
+    output reg [COUNTER_WIDTH-1:0] tensorOpsCompleted,
+    output reg [COUNTER_WIDTH-1:0] clockGatedCycles,
+    output reg [COUNTER_WIDTH-1:0] powerGatedCycles,
+    output reg [15:0] coreUtilization,
     output reg [15:0] ipc
 );
-    reg [COUNTER_WIDTH-1:0] active_core_cycles;
+    reg [COUNTER_WIDTH-1:0] activeCoreCycles;
 
-    function automatic int count_ones;
+    function automatic int countOnes;
         input [NUM_CORES-1:0] vec;
         int cnt;
         begin
@@ -63,57 +63,57 @@ module performance_counters #(
             for (int i = 0; i < NUM_CORES; i++) begin
                 if (vec[i]) cnt = cnt + 1;
             end
-            count_ones = cnt;
+            countOnes = cnt;
         end
     endfunction
     always @(posedge clk) begin
         if (reset || clear) begin
-            cycle_count <= 0;
-            total_issued <= 0;
-            total_retired <= 0;
-            l1_read_hits <= 0;
-            l1_write_hits <= 0;
-            l2_read_hits <= 0;
-            l2_write_hits <= 0;
-            shared_mem_hits <= 0;
-            shared_mem_conflicts <= 0;
-            external_mem_accesses <= 0;
-            l3_accesses <= 0;
-            stall_cycles_mem <= 0;
-            stall_cycles_tensor <= 0;
-            stall_cycles_reg <= 0;
-            stall_cycles_structural <= 0;
-            tensor_ops_started <= 0;
-            tensor_ops_completed <= 0;
-            clock_gated_cycles <= 0;
-            power_gated_cycles <= 0;
-            active_core_cycles <= 0;
-            core_utilization <= 0;
+            cycleCount <= 0;
+            totalIssued <= 0;
+            totalRetired <= 0;
+            l1ReadHits <= 0;
+            l1WriteHits <= 0;
+            l2ReadHits <= 0;
+            l2WriteHits <= 0;
+            sharedMemHits <= 0;
+            sharedMemConflicts <= 0;
+            externalMemAccesses <= 0;
+            l3Accesses <= 0;
+            stallCyclesMem <= 0;
+            stallCyclesTensor <= 0;
+            stallCyclesReg <= 0;
+            stallCyclesStructural <= 0;
+            tensorOpsStarted <= 0;
+            tensorOpsCompleted <= 0;
+            clockGatedCycles <= 0;
+            powerGatedCycles <= 0;
+            activeCoreCycles <= 0;
+            coreUtilization <= 0;
             ipc <= 0;
         end else if (enable) begin
-            cycle_count <= cycle_count + 1;
-            total_issued <= total_issued + count_ones(instr_issued);
-            total_retired <= total_retired + count_ones(instr_retired);
-            l1_read_hits <= l1_read_hits + count_ones(l1_read_hit);
-            l1_write_hits <= l1_write_hits + count_ones(l1_write_hit);
-            l2_read_hits <= l2_read_hits + count_ones(l2_read_hit);
-            l2_write_hits <= l2_write_hits + count_ones(l2_write_hit);
-            shared_mem_hits <= shared_mem_hits + count_ones(shared_mem_hit);
-            shared_mem_conflicts <= shared_mem_conflicts + count_ones(shared_mem_conflict);
-            external_mem_accesses <= external_mem_accesses + count_ones(external_mem_access);
-            l3_accesses <= l3_accesses + count_ones(l3_access);
-            stall_cycles_mem <= stall_cycles_mem + count_ones(stall_mem);
-            stall_cycles_tensor <= stall_cycles_tensor + count_ones(stall_tensor);
-            stall_cycles_reg <= stall_cycles_reg + count_ones(stall_reg_hazard);
-            stall_cycles_structural <= stall_cycles_structural + count_ones(stall_structural);
-            tensor_ops_started <= tensor_ops_started + count_ones(tensor_op_start);
-            tensor_ops_completed <= tensor_ops_completed + count_ones(tensor_op_complete);
-            clock_gated_cycles <= clock_gated_cycles + count_ones(core_clock_gated);
-            power_gated_cycles <= power_gated_cycles + count_ones(core_power_gated);
-            active_core_cycles <= active_core_cycles + count_ones(core_active);
-            if (cycle_count[7:0] == 8'hFF && cycle_count > 0) begin
-                core_utilization <= (active_core_cycles << 8) / (cycle_count * NUM_CORES);
-                ipc <= (total_retired << 8) / cycle_count;
+            cycleCount <= cycleCount + 1;
+            totalIssued <= totalIssued + countOnes(instrIssued);
+            totalRetired <= totalRetired + countOnes(instrRetired);
+            l1ReadHits <= l1ReadHits + countOnes(l1ReadHit);
+            l1WriteHits <= l1WriteHits + countOnes(l1WriteHit);
+            l2ReadHits <= l2ReadHits + countOnes(l2ReadHit);
+            l2WriteHits <= l2WriteHits + countOnes(l2WriteHit);
+            sharedMemHits <= sharedMemHits + countOnes(sharedMemHit);
+            sharedMemConflicts <= sharedMemConflicts + countOnes(sharedMemConflict);
+            externalMemAccesses <= externalMemAccesses + countOnes(externalMemAccess);
+            l3Accesses <= l3Accesses + countOnes(l3Access);
+            stallCyclesMem <= stallCyclesMem + countOnes(stallMem);
+            stallCyclesTensor <= stallCyclesTensor + countOnes(stallTensor);
+            stallCyclesReg <= stallCyclesReg + countOnes(stallRegHazard);
+            stallCyclesStructural <= stallCyclesStructural + countOnes(stallStructural);
+            tensorOpsStarted <= tensorOpsStarted + countOnes(tensorOpStart);
+            tensorOpsCompleted <= tensorOpsCompleted + countOnes(tensorOpComplete);
+            clockGatedCycles <= clockGatedCycles + countOnes(coreClockGated);
+            powerGatedCycles <= powerGatedCycles + countOnes(corePowerGated);
+            activeCoreCycles <= activeCoreCycles + countOnes(coreActive);
+            if (cycleCount[7:0] == 8'hFF && cycleCount > 0) begin
+                coreUtilization <= (activeCoreCycles << 8) / (cycleCount * NUM_CORES);
+                ipc <= (totalRetired << 8) / cycleCount;
             end
         end
     end

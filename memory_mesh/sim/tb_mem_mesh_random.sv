@@ -56,11 +56,8 @@ module tb_mem_mesh_random;
         rst_n = 1;
         #20000;
 
-        $display("==================================================");
-        $display("GridX Memory Mesh NoC v2.0 — Randomized Test");
-        $display("Topology: %0dx%0dx%0d Mesh (%0d Nodes)", MESH_X, MESH_Y, MESH_Z, NUM_NODES);
-        $display("Clock: %0d MHz | Pipeline: 3-stage | Link Reg: 1-cycle", NOC_FREQ_MHZ);
-        $display("==================================================");
+        $display("[MESH_NOC] Memory Mesh NoC v2.0 - Randomized Test");
+        $display("[MESH_NOC] Topology: %0dx%0dx%0d Mesh (%0d Nodes)", MESH_X, MESH_Y, MESH_Z, NUM_NODES);
 
         for (int iter = 0; iter < 50; iter++) begin
             src_node  = $urandom_range(0, NUM_NODES-1);
@@ -114,10 +111,7 @@ module tb_mem_mesh_random;
             #50000;
         end
 
-        $display("==================================================");
-        $display("ALL 50 RANDOMIZED TESTS PASSED!");
-        $display("Received: %0d / 50", received_count);
-        $display("==================================================");
+        $display("[MESH_NOC] RESULT: ALL %0d RANDOMIZED TESTS PASSED", received_count);
         $finish;
     end
 endmodule

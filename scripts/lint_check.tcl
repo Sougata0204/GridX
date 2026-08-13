@@ -11,7 +11,6 @@ set OUTPUT_DIR   [file join $PROJECT_ROOT vivado_output]
 
 file mkdir $OUTPUT_DIR
 
-# ---- Source files ----
 set SRC_DIR      [file join $PROJECT_ROOT src]
 set MESH_DIR     [file join $PROJECT_ROOT memory_mesh src]
 
@@ -93,15 +92,16 @@ set SRC_FILES [list \
     $SRC_DIR/gridx_kernel_top.sv \
 ]
 
-# ---- Read Sources ----
 puts " GridX³ — ASIC Lint Check (Elaboration)"
 puts " Top:  $TOP_MODULE"
 puts " Config: 2x2x2 = 8 cores, 1 warp, 4 threads"
 
 read_verilog -sv $SRC_FILES
 
-# ---- Elaboration Only (Lint) ----
 puts "\n>>> Running RTL Elaboration (lint check)..."
-synth_design -top $TOP_MODULE -part $PART -rtl
-
-puts " LINT CHECK PASSED — RTL Elaboration OK"
+if {[catch {synth_design -top $TOP_MODULE -part $PART -rtl} result]} {
+    puts " LINT CHECK FAILED"
+    puts " Error: $result"
+} else {
+    puts " LINT CHECK PASSED — RTL Elaboration OK"
+}

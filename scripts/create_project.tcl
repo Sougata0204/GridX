@@ -15,11 +15,9 @@ if {$argc > 0 && [lindex $argv 0] ne ""} {
     set PART [lindex $argv 0]
 }
 
-# ---- Create Project ----
 create_project $PROJ_NAME $PROJ_DIR -part $PART -force
 set_property target_language Verilog [current_project]
 
-# ---- Add Design Sources ----
 # Memory mesh package + modules (must compile first)
 set MEMORY_MESH_SRC [file join $PROJECT_ROOT memory_mesh src]
 if {[file exists $MEMORY_MESH_SRC]} {
@@ -35,29 +33,23 @@ foreach f [get_files *.vh] {
     set_property file_type "Verilog Header" $f
 }
 
-# ---- Add Simulation Sources ----
 add_files -fileset sim_1 -norecurse [glob [file join $PROJECT_ROOT sim *.sv]]
 set MEMORY_MESH_SIM [file join $PROJECT_ROOT memory_mesh sim]
 if {[file exists $MEMORY_MESH_SIM]} {
     add_files -fileset sim_1 -norecurse [glob [file join $MEMORY_MESH_SIM *.sv]]
 }
 
-# ---- Add Constraints ----
 add_files -fileset constrs_1 -norecurse [glob [file join $PROJECT_ROOT constraints *.xdc]]
 
-# ---- Set Top Module ----
 set_property top $TOP_MODULE [current_fileset]
 
-# ---- Compile Order: packages first ----
 set_property source_mgmt_mode All [current_project]
 reorder_files -front [get_files gridx_mem_pkg.sv]
 reorder_files -after [get_files gridx_mem_pkg.sv] [get_files gridx_pkg.sv]
 
-# ---- Simulation Top (unified testbench) ----
 set_property top tb_gridx_top [get_filesets sim_1]
 set_property top_lib xil_defaultlib [get_filesets sim_1]
 
-# ---- IMPORTANT: Do NOT add files from MemoryMesh_NoC/ ----
 # GridX uses its own integrated memory_mesh/src/ modules.
 # Adding MemoryMesh_NoC/ causes duplicate type definitions and errors.
 

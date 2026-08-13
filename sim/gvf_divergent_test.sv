@@ -81,7 +81,7 @@ module gvf_divergent_test;
         $display("[GRIDX3_CONFIG] TSV Aggregate Bits per Cycle: %0d bits/cycle (%0d Bytes/cycle)", gridx_config_pkg::CFG_TSV_AGGREGATE_BW, gridx_config_pkg::CFG_TSV_AGGREGATE_BW/8);
         $display("[GRIDX3_CONFIG] Calculated Vertical Bandwidth: %0d GB/s (6.144 TB/s)", (gridx_config_pkg::CFG_TSV_AGGREGATE_BW / 8) * (gridx_config_pkg::CFG_CORE_FREQ_MHZ / 1000));
         $display("[GRIDX3_CONFIG] NoC Flit Width (Row Direction): %0d bits", gridx_config_pkg::CFG_NOC_FLIT_WIDTH);
-        $display("=== DIVERGENT BRANCH TEST: 4 threads, 1 block, 1 core ===");
+        $display("[GRIDX3_TEST] Divergent Branch Test: 4 threads, 1 block, 1 core");
         rst_n = 0; repeat(20) @(posedge clk); rst_n = 1; repeat(5) @(posedge clk);
 
         // Poison BRAM locations
@@ -144,8 +144,7 @@ module gvf_divergent_test;
         end
 
         // Read back all 4 thread locations
-        $display("");
-        $display("=== PER-THREAD SCOREBOARD ===");
+        $display("[SCOREBOARD] Per-Thread Results:");
         begin : check
             integer tid;
             reg [7:0] expected, got;
@@ -153,7 +152,6 @@ module gvf_divergent_test;
                 read_dmem({12'b0, BRAM_IDX} + tid);
                 got = dmem_rd_data;
                 expected = (tid % 2 == 0) ? 8'd10 : 8'd20;
-                if (got === expected)
                     $display("  [PASS] thread %0d: DMEM[%0d] = 0x%02h (expected 0x%02h)", tid, BRAM_IDX+tid, got, expected);
                 else
                     $display("  [FAIL] thread %0d: DMEM[%0d] = 0x%02h (expected 0x%02h)", tid, BRAM_IDX+tid, got, expected);

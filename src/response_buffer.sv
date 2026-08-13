@@ -9,7 +9,7 @@
 // Timing: 1-cycle enqueue, 1-cycle dequeue.
 // Integration: Instantiated in core.sv.
 
-module response_buffer #(
+module responseBuffer #(
     parameter BUFFER_DEPTH = 4,
     parameter DATA_WIDTH = 16,
     parameter ADDR_WIDTH = 16,
@@ -18,109 +18,109 @@ module response_buffer #(
 ) (
     input wire clk,
     input wire reset,
-    input wire resp_valid,
-    input wire [ADDR_WIDTH-1:0] resp_addr,
-    input wire [DATA_WIDTH-1:0] resp_data,
-    input wire [WARP_ID_WIDTH-1:0] resp_warp_id,
-    output wire resp_ready,
-    input wire [NUM_WARPS-1:0] warp_has_pending_load,
-    input wire [3:0] warp_pending_count [NUM_WARPS-1:0],
-    output reg out_valid,
-    output reg [ADDR_WIDTH-1:0] out_addr,
-    output reg [DATA_WIDTH-1:0] out_data,
-    output reg [WARP_ID_WIDTH-1:0] out_warp_id,
-    input wire out_ready,
-    output reg [NUM_WARPS-1:0] warp_can_resume,
-    output reg [31:0] perf_early_wakeups,
-    output reg [31:0] perf_total_responses,
-    output reg [31:0] perf_buffer_full_stalls
+    input wire respValid,
+    input wire [ADDR_WIDTH-1:0] respAddr,
+    input wire [DATA_WIDTH-1:0] respData,
+    input wire [WARP_ID_WIDTH-1:0] respWarpId,
+    output wire respReady,
+    input wire [NUM_WARPS-1:0] warpHasPendingLoad,
+    input wire [3:0] warpPendingCount [NUM_WARPS-1:0],
+    output reg outValid,
+    output reg [ADDR_WIDTH-1:0] outAddr,
+    output reg [DATA_WIDTH-1:0] outData,
+    output reg [WARP_ID_WIDTH-1:0] outWarpId,
+    input wire outReady,
+    output reg [NUM_WARPS-1:0] warpCanResume,
+    output reg [31:0] perfEarlyWakeups,
+    output reg [31:0] perfTotalResponses,
+    output reg [31:0] perfBufferFullStalls
 );
-    reg [ADDR_WIDTH-1:0] buf_addr [BUFFER_DEPTH-1:0];
-    reg [DATA_WIDTH-1:0] buf_data [BUFFER_DEPTH-1:0];
-    reg [WARP_ID_WIDTH-1:0] buf_warp [BUFFER_DEPTH-1:0];
-    reg [BUFFER_DEPTH-1:0] buf_valid;
-    reg [$clog2(BUFFER_DEPTH):0] buf_count;
+    reg [ADDR_WIDTH-1:0] bufAddr [BUFFER_DEPTH-1:0];
+    reg [DATA_WIDTH-1:0] bufData [BUFFER_DEPTH-1:0];
+    reg [WARP_ID_WIDTH-1:0] bufWarp [BUFFER_DEPTH-1:0];
+    reg [BUFFER_DEPTH-1:0] bufValid;
+    reg [$clog2(BUFFER_DEPTH):0] bufCount;
     reg [$clog2(BUFFER_DEPTH)-1:0] head, tail;
     integer i, w;
-    reg [3:0] warp_received [NUM_WARPS-1:0];
-    wire buf_full = (buf_count == BUFFER_DEPTH);
-    wire buf_empty = (buf_count == 0);
-    assign resp_ready = !buf_full;
+    reg [3:0] warpReceived [NUM_WARPS-1:0];
+    wire bufFull = (bufCount == BUFFER_DEPTH);
+    wire bufEmpty = (bufCount == 0);
+    assign respReady = !bufFull;
     always @(*) begin
-        warp_can_resume = 0;
+        warpCanResume = 0;
         for (w = 0; w < NUM_WARPS; w = w + 1) begin
-            if (warp_has_pending_load[w] &&
-                warp_received[w] >= warp_pending_count[w] &&
-                warp_pending_count[w] > 0) begin
-                warp_can_resume[w] = 1;
+            if (warpHasPendingLoad[w] &&
+                warpReceived[w] >= warpPendingCount[w] &&
+                warpPendingCount[w] > 0) begin
+                warpCanResume[w] = 1;
             end
         end
     end
     always @(posedge clk) begin
         if (reset) begin
-            buf_valid <= 0;
-            buf_count <= 0;
+            bufValid <= 0;
+            bufCount <= 0;
             head <= 0;
             tail <= 0;
-            out_valid <= 0;
-            out_addr <= 0;
-            out_data <= 0;
-            out_warp_id <= 0;
-            perf_early_wakeups <= 0;
-            perf_total_responses <= 0;
-            perf_buffer_full_stalls <= 0;
+            outValid <= 0;
+            outAddr <= 0;
+            outData <= 0;
+            outWarpId <= 0;
+            perfEarlyWakeups <= 0;
+            perfTotalResponses <= 0;
+            perfBufferFullStalls <= 0;
             for (i = 0; i < BUFFER_DEPTH; i = i + 1) begin
-                buf_addr[i] <= 0;
-                buf_data[i] <= 0;
-                buf_warp[i] <= 0;
+                bufAddr[i] <= 0;
+                bufData[i] <= 0;
+                bufWarp[i] <= 0;
             end
             for (w = 0; w < NUM_WARPS; w = w + 1) begin
-                warp_received[w] <= 0;
+                warpReceived[w] <= 0;
             end
         end else begin
-            if (resp_valid && resp_ready) begin
+            if (respValid && respReady) begin
                 `ifdef GRIDX_RB_DEBUG
                 $display("[RB_WRITE] tail %d addr=%h data=%h warp=%d",
-                         tail, resp_addr, resp_data, resp_warp_id);
+                         tail, respAddr, respData, respWarpId);
                 `endif
-                buf_addr[tail] <= resp_addr;
-                buf_data[tail] <= resp_data;
-                buf_warp[tail] <= resp_warp_id;
-                buf_valid[tail] <= 1;
+                bufAddr[tail] <= respAddr;
+                bufData[tail] <= respData;
+                bufWarp[tail] <= respWarpId;
+                bufValid[tail] <= 1;
                 tail <= tail + 1;
-                warp_received[resp_warp_id] <= warp_received[resp_warp_id] + 1;
-                perf_total_responses <= perf_total_responses + 1;
+                warpReceived[respWarpId] <= warpReceived[respWarpId] + 1;
+                perfTotalResponses <= perfTotalResponses + 1;
             end
-            if (resp_valid && !resp_ready) begin
-                perf_buffer_full_stalls <= perf_buffer_full_stalls + 1;
+            if (respValid && !respReady) begin
+                perfBufferFullStalls <= perfBufferFullStalls + 1;
             end
-            if (resp_valid && resp_ready && !(!buf_empty && out_ready)) begin
-                buf_count <= buf_count + 1;
-            end else if (!resp_valid && (!buf_empty && out_ready)) begin
-                buf_count <= buf_count - 1;
+            if (respValid && respReady && !(!bufEmpty && outReady)) begin
+                bufCount <= bufCount + 1;
+            end else if (!respValid && (!bufEmpty && outReady)) begin
+                bufCount <= bufCount - 1;
             end
             
-            out_valid <= 0;
-            if (!buf_empty && out_ready) begin
+            outValid <= 0;
+            if (!bufEmpty && outReady) begin
                 `ifdef GRIDX_RB_DEBUG
                 $display("[RB_POP] head %d, data=%h",
-                         head, buf_data[head]);
+                         head, bufData[head]);
                 `endif
-                out_valid <= 1;
-                out_addr <= buf_addr[head];
-                out_data <= buf_data[head];
-                out_warp_id <= buf_warp[head];
-                buf_valid[head] <= 0;
+                outValid <= 1;
+                outAddr <= bufAddr[head];
+                outData <= bufData[head];
+                outWarpId <= bufWarp[head];
+                bufValid[head] <= 0;
                 head <= head + 1;
             end
             `ifdef GRIDX_RB_DEBUG
-            $display("[RB_STATUS] buf_count=%d head=%d tail=%d out_valid=%b out_data=%h",
-                     buf_count, head, tail, out_valid, out_data);
+            $display("[RB_STATUS] bufCount=%d head=%d tail=%d outValid=%b outData=%h",
+                     bufCount, head, tail, outValid, outData);
             `endif
             for (w = 0; w < NUM_WARPS; w = w + 1) begin
-                if (warp_can_resume[w] && !warp_has_pending_load[w]) begin
-                    warp_received[w] <= 0;
-                    perf_early_wakeups <= perf_early_wakeups + 1;
+                if (warpCanResume[w] && !warpHasPendingLoad[w]) begin
+                    warpReceived[w] <= 0;
+                    perfEarlyWakeups <= perfEarlyWakeups + 1;
                 end
             end
         end

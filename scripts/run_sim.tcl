@@ -9,7 +9,6 @@ set OUTPUT_DIR   [file join $PROJECT_ROOT vivado_output]
 
 file mkdir $OUTPUT_DIR
 
-# ---- Source files ----
 set SRC_DIR      [file join $PROJECT_ROOT src]
 set MESH_DIR     [file join $PROJECT_ROOT memory_mesh src]
 set SIM_DIR      [file join $PROJECT_ROOT sim]
@@ -17,7 +16,6 @@ set SIM_DIR      [file join $PROJECT_ROOT sim]
 puts " GridX³ — Vivado Simulation (xsim)"
 puts " Testbench: $TOP_TB"
 
-# ---- Compile ----
 puts "\n>>> Compiling design + testbench..."
 
 set compile_cmd "xvlog -sv --nolog"
@@ -51,7 +49,6 @@ if {[catch {exec {*}[split $compile_cmd] 2>@1} result]} {
 }
 puts $result
 
-# ---- Elaborate ----
 puts "\n>>> Elaborating..."
 set debug_level "off"
 if {[info exists ::env(XILINX_DEBUG_LEVEL)]} {
@@ -63,7 +60,6 @@ if {[catch {exec xelab $TOP_TB -timescale 1ns/1ns -debug $debug_level --nolog -s
 }
 puts $result
 
-# ---- Simulate ----
 puts "\n>>> Running simulation..."
 if {[catch {exec xsim ${TOP_TB}_sim -runall --nolog 2>@1} result]} {
     puts $result
