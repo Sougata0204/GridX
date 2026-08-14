@@ -61,7 +61,7 @@ module tb_hbm3_stress;
         .tWR(3),
         .tRRD(2)
     ) dut (
-        .clk(clk), .reset(reset),
+        .clkSys(clk), .reset(reset),
         .req_valid(req_valid),
         .req_addr(req_addr),
         .req_wdata(req_wdata),

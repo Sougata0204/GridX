@@ -1,15 +1,15 @@
 // GridX3 UVM Master Package
-// Imports UVM 1.2 base and includes all GridX³ UVM components in dependency order.
+// Imports UVM 1.2 base and includes all GridX? UVM components in dependency order.
 
 `ifndef GRIDX_UVM_PKG_SV
 `define GRIDX_UVM_PKG_SV
 
 `timescale 1ns/1ps
 
-import gridx_mem_pkg::*;
-
+// Ensure proper include order for components
 package gridx_uvm_pkg;
 
+    import gridx_mem_pkg::*;
     import uvm_pkg::*;
     `include "uvm_macros.svh"
 

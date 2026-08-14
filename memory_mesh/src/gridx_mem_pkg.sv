@@ -121,5 +121,18 @@ package gridx_mem_pkg;
         is_at_boundary_z_neg = (c.z == 0);
     endfunction
 
+    typedef struct packed {
+        logic [ADDR_WIDTH-1:0]  addr;
+        logic [DATA_WIDTH-1:0]  data;
+        logic [TX_ID_W-1:0]     tx_id;
+        logic                   is_store;
+    } l2_req_t;
+
+    typedef struct packed {
+        logic [DATA_WIDTH-1:0]  data;
+        logic [TX_ID_W-1:0]     tx_id;
+        logic                   error;
+    } l2_resp_t;
+
 endpackage
 

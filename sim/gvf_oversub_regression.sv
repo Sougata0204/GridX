@@ -1,19 +1,19 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-// ╔══════════════════════════════════════════════════════════════════════╗
-// ║  Block Oversubscription Regression - Per-Thread Scoreboard v2      ║
-// ║  Fixes:                                                            ║
-// ║    1. STR field order: {op, rd_unused, rs=addr_reg, rt=data_reg}   ║
-// ║    2. Addresses >= 0x8000 to hit external BRAM (testbench-visible) ║
-// ║    3. Per-thread address = base + global_tid (unique per thread)    ║
-// ║    4. Per-thread scoreboard loop verifies ALL threads executed      ║
-// ║  Identity registers (from registers.sv):                           ║
-// ║    r0  = zero register (reads always return 0)                     ║
-// ║    r13 = block_id (continuously updated)                           ║
-// ║    r14 = THREADS_PER_BLOCK (constant = 4)                          ║
-// ║    r15 = THREAD_ID (lane index 0..TPB-1, static per thread)        ║
-// ╚══════════════════════════════════════════════════════════════════════╝
+// ????????????????????????????????????????????????????????????????????????
+// ?  Block Oversubscription Regression - Per-Thread Scoreboard v2      ?
+// ?  Fixes:                                                            ?
+// ?    1. STR field order: {op, rd_unused, rs=addr_reg, rt=data_reg}   ?
+// ?    2. Addresses >= 0x8000 to hit external BRAM (testbench-visible) ?
+// ?    3. Per-thread address = base + global_tid (unique per thread)    ?
+// ?    4. Per-thread scoreboard loop verifies ALL threads executed      ?
+// ?  Identity registers (from registers.sv):                           ?
+// ?    r0  = zero register (reads always return 0)                     ?
+// ?    r13 = block_id (continuously updated)                           ?
+// ?    r14 = THREADS_PER_BLOCK (constant = 4)                          ?
+// ?    r15 = THREAD_ID (lane index 0..TPB-1, static per thread)        ?
+// ????????????????????????????????????????????????????????????????????????
 
 module gvf_oversub_regression;
 
@@ -28,8 +28,8 @@ module gvf_oversub_regression;
     localparam PROG_ADDR_BITS    = 12;
     localparam PROG_BITS         = 16;
 
-    // BRAM base: CONST 0x80 sign-extends to 0xFF80 (>= 0x8000 → external BRAM)
-    // BRAM index = addr[9:0] = 0x380 = 896.  Max 64 threads → index 959 < 1024
+    // BRAM base: CONST 0x80 sign-extends to 0xFF80 (>= 0x8000 ? external BRAM)
+    // BRAM index = addr[9:0] = 0x380 = 896.  Max 64 threads ? index 959 < 1024
     localparam [15:0] BRAM_BASE  = 16'hFF80;
     localparam [9:0]  BRAM_IDX   = BRAM_BASE[9:0]; // 0x380 = 896
 
@@ -58,20 +58,20 @@ module gvf_oversub_regression;
     reg [DATA_BITS-1:0]      dmem_wr_data = 0;
     wire [DATA_BITS-1:0]     dmem_rd_data;
 
-    gridx_kernel_top #(
+    gridxKernelTop #(
         .CUBE_X(2), .CUBE_Y(2), .CUBE_Z(1),
         .PMEM_DEPTH(PMEM_DEPTH), .DMEM_DEPTH(DMEM_DEPTH), .SIM_TIMEOUT_CYCLES(TIMEOUT)
     ) dut (
-        .clk_sys(clk), .rst_n(rst_n),
-        .host_wr_en(host_wr_en), .host_wr_data(host_wr_data), .host_start(host_start),
-        .kernel_done(kernel_done), .kernel_fault(kernel_fault), .kernel_state_o(kernel_state),
-        .perf_hbm_reads(perf_hbm_reads), .perf_hbm_writes(perf_hbm_writes),
-        .perf_total_flits(perf_total_flits), .perf_cycle_count(perf_cycle_count),
-        .perf_active_cores(perf_active_cores),
-        .dbg_core_done_sample(dbg_core_done_sample), .dbg_mesh_busy(dbg_mesh_busy),
-        .pmem_wr_en(pmem_wr_en), .pmem_wr_addr(pmem_wr_addr), .pmem_wr_data(pmem_wr_data),
-        .dmem_wr_en(dmem_wr_en), .dmem_wr_addr(dmem_wr_addr), .dmem_wr_data(dmem_wr_data),
-        .dmem_rd_en(dmem_rd_en), .dmem_rd_addr(dmem_rd_addr), .dmem_rd_data(dmem_rd_data)
+        .clkSys(clk), .rstN(rst_n),
+        .hostWrEn(host_wr_en), .hostWrData(host_wr_data), .hostStart(host_start),
+        .kernelDone(kernel_done), .kernelFault(kernel_fault), .kernelStateO(kernel_state),
+        .perfHbmReads(perf_hbm_reads), .perfHbmWrites(perf_hbm_writes),
+        .perfTotalFlits(perf_total_flits), .perfCycleCount(perf_cycle_count),
+        .perfActiveCores(perf_active_cores),
+        .dbgCoreDoneSample(dbg_core_done_sample), .dbgMeshBusy(dbg_mesh_busy),
+        .pmemWrEn(pmem_wr_en), .pmemWrAddr(pmem_wr_addr), .pmemWrData(pmem_wr_data),
+        .dmemWrEn(dmem_wr_en), .dmemWrAddr(dmem_wr_addr), .dmemWrData(dmem_wr_data),
+        .dmemRdEn(dmem_rd_en), .dmemRdAddr(dmem_rd_addr), .dmemRdData(dmem_rd_data)
     );
 
     // Counters
@@ -164,8 +164,8 @@ module gvf_oversub_regression;
     // address    = 0xFF80 + global_tid  (hits external BRAM)
     // Stores:   DMEM[address] = value
     // STR encoding: {OP_STR, rd=unused, rs=addr_reg, rt=data_reg}
-    // rs field → register whose VALUE is used as ADDRESS
-    // rt field → register whose VALUE is used as DATA
+    // rs field ? register whose VALUE is used as ADDRESS
+    // rt field ? register whose VALUE is used as DATA
     task automatic load_prog_add_store_v2;
         write_pmem(0, enc_const(4'h1, 8'h80));                   // r1 = 0xFF80 (sign-ext, external BRAM base)
         write_pmem(1, enc_rrr(OP_MUL, 4'h2, 4'hD, 4'hE));       // r2 = r13 * r14 = block_id * TPB
@@ -182,11 +182,11 @@ module gvf_oversub_regression;
     // SAXPY: result = a*x + y = 2*3 + 1 = 7 for all threads
     // Per-thread store to unique address for scoreboard verification.
     // ORIGINAL BUG (load_prog_saxpy in gvf.sv / gvf_2d.sv):
-    // CONST r0, 2  ← r0 is zero register, writes ignored on read!
-    // CONST r1, 0  ← x = 0
-    // MUL r2, r0, r1 → 0 * 0 = 0 (r0 reads as 0)
-    // STR {rd=3, rs=1, rt=0} → addr=reg[1]=0, data=reg[0]=0
-    // → Stores 0 to shared memory addr 0 (not external BRAM)
+    // CONST r0, 2  ? r0 is zero register, writes ignored on read!
+    // CONST r1, 0  ? x = 0
+    // MUL r2, r0, r1 ? 0 * 0 = 0 (r0 reads as 0)
+    // STR {rd=3, rs=1, rt=0} ? addr=reg[1]=0, data=reg[0]=0
+    // ? Stores 0 to shared memory addr 0 (not external BRAM)
     // FIX: Use r1-r12 for operands, store to external BRAM >= 0x8000
     task automatic load_prog_saxpy_v2;
         write_pmem(0,  enc_const(4'h1, 8'h02));                  // r1 = 2 (a)
@@ -222,6 +222,7 @@ module gvf_oversub_regression;
             else
                 expected = (tid + 5) & 8'hFF;  // ADD-STORE: global_tid + 5
             total_assertions = total_assertions + 1;
+            if (got == expected) begin
                 tests_passed = tests_passed + 1;
                 sb_pass = sb_pass + 1;
             end else begin
@@ -248,12 +249,12 @@ module gvf_oversub_regression;
         blocks_expected = (threads + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
         suite_num = suite_num + 1;
         $display("");
-        $display("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        $display("????????????????????????????????????????????????????????????");
         $display("  Suite %0d: %0s", suite_num, label);
         $display("  Threads=%0d  Blocks=%0d  Cores=%0d  Oversub=%.1fx",
                  threads, blocks_expected, NUM_CORES,
                  1.0 * blocks_expected / NUM_CORES);
-        $display("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        $display("????????????????????????????????????????????????????????????");
 
         do_reset();
         // Poison BRAM locations so unexecuted threads are detectable
@@ -282,7 +283,7 @@ module gvf_oversub_regression;
         if (kernel_done && !kernel_fault) begin
             scoreboard_check(label, threads, is_saxpy);
         end else begin
-            $display("  [SKIP] Scoreboard skipped — kernel did not complete normally");
+            $display("  [SKIP] Scoreboard skipped ? kernel did not complete normally");
         end
 
         $display("  Cycles=%0d", t_end - t_start);
@@ -294,13 +295,13 @@ module gvf_oversub_regression;
     // MAIN TEST SEQUENCE
     initial begin
         $display("");
-        $display("╔══════════════════════════════════════════════════════════════════╗");
-        $display("║  Block Oversubscription Regression v2 — Per-Thread Scoreboard  ║");
-        $display("║  CUBE_Z=1 (4 cores)  THREADS_PER_BLOCK=4                      ║");
-        $display("║  Program: ADD-STORE (global_tid + 5) to ext BRAM               ║");
-        $display("╚══════════════════════════════════════════════════════════════════╝");
+        $display("????????????????????????????????????????????????????????????????????");
+        $display("?  Block Oversubscription Regression v2 ? Per-Thread Scoreboard  ?");
+        $display("?  CUBE_Z=1 (4 cores)  THREADS_PER_BLOCK=4                      ?");
+        $display("?  Program: ADD-STORE (global_tid + 5) to ext BRAM               ?");
+        $display("????????????????????????????????????????????????????????????????????");
 
-        // ADD-STORE ladder: 1×, 1×+1, 2×, 4× oversubscription
+        // ADD-STORE ladder: 1?, 1?+1, 2?, 4? oversubscription
 
         // Case 1: blocks == NUM_CORES (baseline, no oversubscription)
         // 16 threads / 4 tpb = 4 blocks = 4 cores
@@ -310,19 +311,19 @@ module gvf_oversub_regression;
         // 20 threads / 4 tpb = 5 blocks on 4 cores
         run_verified_kernel("AS-1x+1-Edge", 20, 0);
 
-        // Case 3: blocks == 2 × NUM_CORES (original deadlock case)
+        // Case 3: blocks == 2 ? NUM_CORES (original deadlock case)
         // 32 threads / 4 tpb = 8 blocks on 4 cores
         run_verified_kernel("AS-2x-Original", 32, 0);
 
-        // Case 4: blocks == 4 × NUM_CORES (heavy oversubscription)
+        // Case 4: blocks == 4 ? NUM_CORES (heavy oversubscription)
         // 64 threads / 4 tpb = 16 blocks on 4 cores
         run_verified_kernel("AS-4x-Heavy", 64, 0);
 
         // SAXPY ladder: same oversubscription levels, different kernel
         $display("");
-        $display("╔══════════════════════════════════════════════════════════════════╗");
-        $display("║  SAXPY Ladder — Per-Thread Scoreboard (a*x+y = 2*3+1 = 7)     ║");
-        $display("╚══════════════════════════════════════════════════════════════════╝");
+        $display("????????????????????????????????????????????????????????????????????");
+        $display("?  SAXPY Ladder ? Per-Thread Scoreboard (a*x+y = 2*3+1 = 7)     ?");
+        $display("????????????????????????????????????????????????????????????????????");
 
         run_verified_kernel("SAXPY-1x-Baseline", 16, 1);
         run_verified_kernel("SAXPY-1x+1-Edge", 20, 1);
@@ -331,21 +332,21 @@ module gvf_oversub_regression;
 
         // FINAL REPORT
         $display("");
-        $display("╔══════════════════════════════════════════════════════════════════╗");
-        $display("║  Oversubscription Regression v2 — FINAL REPORT                 ║");
-        $display("╠══════════════════════════════════════════════════════════════════╣");
-        $display("║  Test Suites           : %4d                                   ║", suite_num);
-        $display("║  Total Assertions      : %4d                                   ║", total_assertions);
-        $display("║  Passed                : %4d                                   ║", tests_passed);
-        $display("║  Failed                : %4d                                   ║", tests_failed);
+        $display("????????????????????????????????????????????????????????????????????");
+        $display("?  Oversubscription Regression v2 ? FINAL REPORT                 ?");
+        $display("????????????????????????????????????????????????????????????????????");
+        $display("?  Test Suites           : %4d                                   ?", suite_num);
+        $display("?  Total Assertions      : %4d                                   ?", total_assertions);
+        $display("?  Passed                : %4d                                   ?", tests_passed);
+        $display("?  Failed                : %4d                                   ?", tests_failed);
         if (tests_failed == 0) begin
-            $display("║                                                                ║");
-            $display("║  ✓ ALL PER-THREAD SCOREBOARD TESTS PASSED                     ║");
+            $display("?                                                                ?");
+            $display("?  ? ALL PER-THREAD SCOREBOARD TESTS PASSED                     ?");
         end else begin
-            $display("║                                                                ║");
-            $display("║  ✗ %0d FAILURES — Review per-thread trace above               ║", tests_failed);
+            $display("?                                                                ?");
+            $display("?  ? %0d FAILURES ? Review per-thread trace above               ?", tests_failed);
         end
-        $display("╚══════════════════════════════════════════════════════════════════╝");
+        $display("????????????????????????????????????????????????????????????????????");
 
         repeat(10) @(posedge clk);
         $finish;

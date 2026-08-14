@@ -1,4 +1,4 @@
-﻿// GridX3 UVM Top-Level Testbench
+// GridX3 UVM Top-Level Testbench
 // Instantiates DUT, creates virtual interfaces, sets uvm_config_db, and calls run_test().
 
 `default_nettype none
@@ -58,13 +58,13 @@ module tb_uvm_top;
         .DATA_ADDR_BITS(DATA_ADDR_BITS),
         .DATA_DATA_BITS(DATA_DATA_BITS)
     ) host_if (
-        .clk(clk),
-        .rst_n(rst_n)
+        .clkSys(clk),
+        .rstN(rst_n)
     );
 
     gridx_kernel_status_if kernel_status_if (
-        .clk(clk),
-        .rst_n(rst_n)
+        .clkSys(clk),
+        .rstN(rst_n)
     );
 
     // DUT instantiation
@@ -84,12 +84,12 @@ module tb_uvm_top;
         .clk_layer      (clk_layer),
         .rst_n          (rst_n),
 
-        // Host interface — driven by UVM driver via virtual interface
+        // Host interface ? driven by UVM driver via virtual interface
         .host_wr_en     (host_if.host_wr_en),
         .host_wr_data   (host_if.host_wr_data),
         .host_start     (host_if.host_start),
 
-        // Kernel status — observed by UVM monitor
+        // Kernel status ? observed by UVM monitor
         .kernel_done    (kernel_status_if.kernel_done),
         .kernel_fault   (kernel_status_if.kernel_fault),
         .kernel_state_o (kernel_status_if.kernel_state),
@@ -105,12 +105,12 @@ module tb_uvm_top;
         .dbg_core_done_sample (kernel_status_if.dbg_core_done_sample),
         .dbg_mesh_busy        (kernel_status_if.dbg_mesh_busy),
 
-        // Program memory load — driven by UVM driver
+        // Program memory load ? driven by UVM driver
         .pmem_wr_en     (host_if.pmem_wr_en),
         .pmem_wr_addr   (host_if.pmem_wr_addr),
         .pmem_wr_data   (host_if.pmem_wr_data),
 
-        // Data memory — driven/read by UVM driver
+        // Data memory ? driven/read by UVM driver
         .dmem_wr_en     (host_if.dmem_wr_en),
         .dmem_wr_addr   (host_if.dmem_wr_addr),
         .dmem_wr_data   (host_if.dmem_wr_data),
@@ -126,7 +126,7 @@ module tb_uvm_top;
         uvm_config_db#(virtual gridx_kernel_status_if)::set(
             null, "uvm_test_top.m_env.m_kernel_agent.*", "kernel_status_vif", kernel_status_if);
 
-        // Run UVM test — memory stress test
+        // Run UVM test ? memory stress test
         run_test("gridx_mem_stress_test");
 
 
@@ -140,11 +140,11 @@ module tb_uvm_top;
     end
 
 
-    //  HBM PATH INSTRUMENTATION — traces the valid chain end-to-end
+    //  HBM PATH INSTRUMENTATION ? traces the valid chain end-to-end
     //  [0] LSU Request
-    //  [1] LSU addr_decode → mesh routing
-    //  [2] Bridge TX → NoC flit injection
-    //  [3] NoC delivery → HBM endpoint nodes
+    //  [1] LSU addr_decode ? mesh routing
+    //  [2] Bridge TX ? NoC flit injection
+    //  [3] NoC delivery ? HBM endpoint nodes
     integer hbm_trace_lsu_req = 0;
     integer hbm_trace_mesh_wr = 0;
     integer hbm_trace_mesh_rd = 0;
@@ -170,7 +170,7 @@ module tb_uvm_top;
                 end
             end
 
-            // Stage 1: Address Decode → mesh routing (check all 64 cores)
+            // Stage 1: Address Decode ? mesh routing (check all 64 cores)
             for (int c = 0; c < 64; c++) begin
                 if (dut.mesh_br_wr_valid[c]) begin
                     hbm_trace_mesh_wr = hbm_trace_mesh_wr + 1;
@@ -204,7 +204,7 @@ module tb_uvm_top;
                 end
             end
 
-            // Stage 2: Bridge → NoC flit injection (check all 64 nodes)
+            // Stage 2: Bridge ? NoC flit injection (check all 64 nodes)
             for (int c = 0; c < 64; c++) begin
                 if (dut.mesh_flit_in_valid[c] && dut.mesh_br_wr_valid[c]) begin
                     hbm_trace_bridge_tx = hbm_trace_bridge_tx + 1;
@@ -214,7 +214,7 @@ module tb_uvm_top;
                 end
             end
 
-            // Stage 3: NoC → HBM endpoint (nodes 60-63)
+            // Stage 3: NoC ? HBM endpoint (nodes 60-63)
             for (int h = 0; h < 4; h++) begin
                 if (dut.mesh_flit_out_valid[60+h]) begin
                     hbm_trace_noc_hbm = hbm_trace_noc_hbm + 1;
@@ -244,7 +244,7 @@ module tb_uvm_top;
         else if (hbm_trace_noc_hbm == 0)
             $display("  DIAGNOSIS: Bridge sent flits but never reached HBM. Check NoC routing.");
         else
-            $display("  DIAGNOSIS: PASS — Full HBM path exercised!");
+            $display("  DIAGNOSIS: PASS ? Full HBM path exercised!");
     end
 
 endmodule

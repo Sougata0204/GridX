@@ -1,4 +1,4 @@
-﻿`timescale 1ns/1ns
+`timescale 1ns/1ns
 module tb_mem_benchmark;
     parameter DATA_MEM_ADDR_BITS = 22;
     parameter DATA_MEM_DATA_BITS = 8;
@@ -46,7 +46,7 @@ module tb_mem_benchmark;
         .WARPS_PER_CORE(WARPS_PER_CORE),
         .CUBE_X(1), .CUBE_Y(1), .CUBE_Z(1), .MESH_X(1), .MESH_Y(1)
     ) dut (
-        .clk(clk), .reset(reset), .start(start), .done(done),
+        .clkSys(clk), .reset(reset), .start(start), .done(done),
         .device_control_write_enable(device_control_write_enable),
         .device_control_data(device_control_data),
         .program_mem_read_valid(program_mem_read_valid),

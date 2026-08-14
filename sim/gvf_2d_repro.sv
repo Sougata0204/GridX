@@ -35,20 +35,20 @@ module gvf_2d_repro;
     reg [DATA_BITS-1:0]      dmem_wr_data = 0;
     wire [DATA_BITS-1:0]     dmem_rd_data;
 
-    gridx_kernel_top #(
+    gridxKernelTop #(
         .CUBE_X(2), .CUBE_Y(2), .CUBE_Z(1),  // 4 cores
         .PMEM_DEPTH(PMEM_DEPTH), .DMEM_DEPTH(DMEM_DEPTH), .SIM_TIMEOUT_CYCLES(TIMEOUT)
     ) dut (
-        .clk_sys(clk), .rst_n(rst_n),
-        .host_wr_en(host_wr_en), .host_wr_data(host_wr_data), .host_start(host_start),
-        .kernel_done(kernel_done), .kernel_fault(kernel_fault), .kernel_state_o(kernel_state),
-        .perf_hbm_reads(perf_hbm_reads), .perf_hbm_writes(perf_hbm_writes),
-        .perf_total_flits(perf_total_flits), .perf_cycle_count(perf_cycle_count),
-        .perf_active_cores(perf_active_cores),
-        .dbg_core_done_sample(dbg_core_done_sample), .dbg_mesh_busy(dbg_mesh_busy),
-        .pmem_wr_en(pmem_wr_en), .pmem_wr_addr(pmem_wr_addr), .pmem_wr_data(pmem_wr_data),
-        .dmem_wr_en(dmem_wr_en), .dmem_wr_addr(dmem_wr_addr), .dmem_wr_data(dmem_wr_data),
-        .dmem_rd_en(dmem_rd_en), .dmem_rd_addr(dmem_rd_addr), .dmem_rd_data(dmem_rd_data)
+        .clkSys(clk), .rstN(rst_n),
+        .hostWrEn(host_wr_en), .hostWrData(host_wr_data), .hostStart(host_start),
+        .kernelDone(kernel_done), .kernelFault(kernel_fault), .kernelStateO(kernel_state),
+        .perfHbmReads(perf_hbm_reads), .perfHbmWrites(perf_hbm_writes),
+        .perfTotalFlits(perf_total_flits), .perfCycleCount(perf_cycle_count),
+        .perfActiveCores(perf_active_cores),
+        .dbgCoreDoneSample(dbg_core_done_sample), .dbgMeshBusy(dbg_mesh_busy),
+        .pmemWrEn(pmem_wr_en), .pmemWrAddr(pmem_wr_addr), .pmemWrData(pmem_wr_data),
+        .dmemWrEn(dmem_wr_en), .dmemWrAddr(dmem_wr_addr), .dmemWrData(dmem_wr_data),
+        .dmemRdEn(dmem_rd_en), .dmemRdAddr(dmem_rd_addr), .dmemRdData(dmem_rd_data)
     );
 
     function [15:0] enc_const(input [3:0] rd, input [7:0] imm);
@@ -101,7 +101,7 @@ module gvf_2d_repro;
         $display("[REPRO] Result: kernel_done=%0b kernel_fault=%0b kernel_state=%0d cycles=%0d",
                  kernel_done, kernel_fault, kernel_state, cycle_cnt);
         if (!kernel_done && !kernel_fault)
-            $display("[REPRO] DEADLOCK CONFIRMED — stuck after %0d cycles", cycle_cnt);
+            $display("[REPRO] DEADLOCK CONFIRMED ? stuck after %0d cycles", cycle_cnt);
 
         repeat(5) @(posedge clk);
         $finish;

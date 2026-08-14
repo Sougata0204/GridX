@@ -25,7 +25,7 @@ class gridx_env extends uvm_env;
     virtual function void build_phase(uvm_phase phase);
         super.build_phase(phase);
 
-        // Build active host agent (driver + sequencer + monitor) — UVM_ACTIVE by default
+        // Build active host agent (driver + sequencer + monitor) ? UVM_ACTIVE by default
         m_host_agent   = gridx_host_agent::type_id::create("m_host_agent", this);
 
         // Build passive kernel status agent (monitor only)
@@ -39,20 +39,20 @@ class gridx_env extends uvm_env;
     virtual function void connect_phase(uvm_phase phase);
         super.connect_phase(phase);
 
-        // Host monitor → Scoreboard (host commands)
+        // Host monitor ? Scoreboard (host commands)
         m_host_agent.m_monitor.ap_host_cmd.connect(m_scoreboard.imp_host_cmd);
 
-        // Host monitor → Scoreboard (memory writes/reads for data checking)
+        // Host monitor ? Scoreboard (memory writes/reads for data checking)
         m_host_agent.m_monitor.ap_mem_write.connect(m_scoreboard.imp_mem_write);
         m_host_agent.m_monitor.ap_mem_read.connect(m_scoreboard.imp_mem_read);
 
-        // Kernel monitor → Scoreboard (kernel done/fault events)
+        // Kernel monitor ? Scoreboard (kernel done/fault events)
         m_kernel_agent.m_monitor.ap_kernel_status.connect(m_scoreboard.imp_kernel_status);
 
-        // Host monitor → Coverage (command types)
+        // Host monitor ? Coverage (command types)
         m_host_agent.m_monitor.ap_host_cmd.connect(m_coverage.analysis_export);
 
-        // Kernel monitor → Coverage (completion/fault events)
+        // Kernel monitor ? Coverage (completion/fault events)
         m_kernel_agent.m_monitor.ap_kernel_status.connect(m_coverage.analysis_export);
     endfunction
 

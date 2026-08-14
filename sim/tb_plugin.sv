@@ -4,15 +4,15 @@
 // Warps/Core   : 4      Threads/Warp : 8     Threads/Core : 32
 // Total Threads: 131072  (4096 cores x 32 threads)
 // THREADS_PER_BLOCK : 32  (one block per core, maximises occupancy)
-// DCR thread_count  : 16-bit → dispatch = ceil(tc/32) blocks → one per core
+// DCR thread_count  : 16-bit ? dispatch = ceil(tc/32) blocks ? one per core
 // Kernel ISA (16-bit words, decoded in decoder.sv / gridx_pkg.sv):
 // [15:12]=opcode  [11:8]=rd  [7:4]=rs  [3:0]=rt   imm=[7:0] sign-ext
-// 0x9XYZ  CONST rd,imm          - rd ← sign-ext(imm)
-// 0x3XYZ  ADD   rd,rs,rt        - rd ← rs + rt
-// 0x4XYZ  SUB   rd,rs,rt        - rd ← rs - rt
-// 0x5XYZ  MUL   rd,rs,rt        - rd ← rs * rt
-// 0x8XYZ  STR   rs,rt (addr=rs) - mem[rs] ← rt
-// 0x7XYZ  LDR   rd,rs  (addr=rs)- rd ← mem[rs]
+// 0x9XYZ  CONST rd,imm          - rd ? sign-ext(imm)
+// 0x3XYZ  ADD   rd,rs,rt        - rd ? rs + rt
+// 0x4XYZ  SUB   rd,rs,rt        - rd ? rs - rt
+// 0x5XYZ  MUL   rd,rs,rt        - rd ? rs * rt
+// 0x8XYZ  STR   rs,rt (addr=rs) - mem[rs] ? rt
+// 0x7XYZ  LDR   rd,rs  (addr=rs)- rd ? mem[rs]
 // 0x2XYZ  CMP   rs,rt           - update NZP
 // 0x1XYZ  BRnzp offset          - branch if NZP matches [11:9]
 // 0xFXXX  RET                   - end warp
@@ -40,21 +40,21 @@ module tb_plugin;
 
     // Base/boost clock modelling (overclock +150 MHz on top of 1400 MHz)
     // 1 ns period = 1000 MHz - we model at simulation unit (1ns period = 1 GHz)
-    // Real: 1750+150 = 1900 MHz boost → period ~526 ps. We simulate at 1ns for speed.
-    localparam CLK_HALF_PERIOD   = 1;    // 1 ns half-period → 500 MHz sim rate
+    // Real: 1750+150 = 1900 MHz boost ? period ~526 ps. We simulate at 1ns for speed.
+    localparam CLK_HALF_PERIOD   = 1;    // 1 ns half-period ? 500 MHz sim rate
 
-    // Occupancy target 0.85 → we want ≥85% of cycles in STATE_EXECUTE
+    // Occupancy target 0.85 ? we want ?85% of cycles in STATE_EXECUTE
     // Thread count set to TOTAL_THREADS to saturate all 4096 cores
     localparam [15:0] FULL_THREAD_COUNT = 16'(TOTAL_THREADS > 65535 ? 65535 : TOTAL_THREADS);
-    // Note: DCR is 16-bit, max 65535. With THREADS_PER_BLOCK=32 → 65535/32=2047 blocks.
+    // Note: DCR is 16-bit, max 65535. With THREADS_PER_BLOCK=32 ? 65535/32=2047 blocks.
     // To hit all 4096 cores we send 4096 blocks = 4096*32=131072 threads, but DCR caps at 65535.
     // We therefore issue two waves: wave-1 = 65535 threads, wave-2 = 65537 threads (clamped).
-    // For simplicity each kernel test sets DCR to the closest multiple of 32 ≤ 65535 = 65504.
-    localparam [15:0] WAVE_TC    = 16'd65504;  // 65504/32=2047 blocks per wave (≥85% core use)
+    // For simplicity each kernel test sets DCR to the closest multiple of 32 ? 65535 = 65504.
+    localparam [15:0] WAVE_TC    = 16'd65504;  // 65504/32=2047 blocks per wave (?85% core use)
 
-    // Program memory: DUT has internal model (address 5 → 0xF000 = RET).
+    // Program memory: DUT has internal model (address 5 ? 0xF000 = RET).
     // We build kernels in a 4096-word ROM that the DUT program_mem model services.
-    // The DUT internal pm model: if addr==12'h005 → 16'hF000 else 16'h0000.
+    // The DUT internal pm model: if addr==12'h005 ? 16'hF000 else 16'h0000.
     // So: program_mem[5] = RET, all others = NOP.
     // We override pm_data via a local shadow and drive it through the gridx_plugin_top
     // port (the DUT handles pm internally so we only use the DCR interface + start).
@@ -170,7 +170,7 @@ module tb_plugin;
     endtask
 
     // Helper task: full kernel launch sequence
-    // reset → dcr_write(tc) → issue_start → wait_done
+    // reset ? dcr_write(tc) ? issue_start ? wait_done
     task run_kernel;
         input [15:0]  thread_count;
         input integer timeout;
@@ -192,7 +192,7 @@ module tb_plugin;
             end
 
             k_start_cycle = cycle_count;
-            $display("[K%0d] %-20s  TC=%0d  Cores≈%0d  Launch @ cycle %0d",
+            $display("[K%0d] %-20s  TC=%0d  Cores?%0d  Launch @ cycle %0d",
                      kern_id, kern_name, thread_count,
                      (thread_count + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK,
                      cycle_count);
@@ -260,12 +260,12 @@ module tb_plugin;
 
         // KERNEL 0 - MASS VECTOR INIT
         // Each thread writes its block_id to global memory.
-        // Program: CONST R1,0 → STR R0,R1 → NOP … → RET
-        // (DUT pm model: addr 5 = RET; 0-4 = NOP → one RET terminates warp)
-        // Thread count: WAVE_TC = 65504 → 2047 blocks
+        // Program: CONST R1,0 ? STR R0,R1 ? NOP ? ? RET
+        // (DUT pm model: addr 5 = RET; 0-4 = NOP ? one RET terminates warp)
+        // Thread count: WAVE_TC = 65504 ? 2047 blocks
         // Goal: saturate ~50% of 4096 cores, verify HBM writes > 0
         run_kernel(
-            16'd65504,      // 65504/32 = 2047 blocks → 2047 cores active
+            16'd65504,      // 65504/32 = 2047 blocks ? 2047 cores active
             500_000,        // timeout cycles
             0,              // kernel id
             "VECTOR_INIT"
@@ -276,7 +276,7 @@ module tb_plugin;
 
         // KERNEL 1 - SECOND WAVE: remaining cores
         // Same NOP+RET program dispatched to the other half of cores.
-        // thread_count = 65504 again → overlapping with done cores, re-dispatch
+        // thread_count = 65504 again ? overlapping with done cores, re-dispatch
         // Goal: confirm all 4096 cores execute without deadlock
         run_kernel(
             16'd65504,      // second wave
@@ -289,11 +289,11 @@ module tb_plugin;
         else           fail_count = fail_count + 1;
 
         // KERNEL 2 - ALU COMPUTE BLAST (no memory, pure throughput)
-        // Program: NOP×5 → RET  (the only available program in DUT pm model)
-        // The NOP pipeline still exercises: FETCH→DECODE→ISSUE→EXECUTE→UPDATE
+        // Program: NOP?5 ? RET  (the only available program in DUT pm model)
+        // The NOP pipeline still exercises: FETCH?DECODE?ISSUE?EXECUTE?UPDATE
         // Each core hits all 5 pipeline stages per instruction.
         // thread_count = 65504 = 2047 cores, maximising scheduling pressure
-        // Goal: IPC proxy > 1 (dual-issue width=2 → can retire 2 NOPs/cycle)
+        // Goal: IPC proxy > 1 (dual-issue width=2 ? can retire 2 NOPs/cycle)
         run_kernel(
             16'd65504,
             500_000,
@@ -322,12 +322,12 @@ module tb_plugin;
         else
             fail_count = fail_count + 1;
 
-        // KERNEL 4 - SINGLE CORE SANITY (tc=32 → 1 block → 1 core)
+        // KERNEL 4 - SINGLE CORE SANITY (tc=32 ? 1 block ? 1 core)
         // Minimal workload: 1 core, 32 threads.
         // Verifies the dispatch/done signal for a trivial case.
         // This is the baseline correctness check.
         run_kernel(
-            16'd32,         // 32/32 = 1 block → 1 core
+            16'd32,         // 32/32 = 1 block ? 1 core
             200_000,
             4,
             "SINGLE_CORE_SANITY"
@@ -340,8 +340,8 @@ module tb_plugin;
         // In HW this maps to the 30-min stress_test_duration.
         // In sim we run for MAX_CYCLES/4 cycles.
         // Overclock config: +150 MHz core, +300 MHz mem.
-        // Power limit: 320W, TDP 115% → we push max blocks_per_sm=8
-        // Thread count: 65504 → 2047 blocks wave; all 4096 cores saturated
+        // Power limit: 320W, TDP 115% ? we push max blocks_per_sm=8
+        // Thread count: 65504 ? 2047 blocks wave; all 4096 cores saturated
         // across two back-to-back dispatches within the same run.
         run_kernel(
             16'd65504,
@@ -355,41 +355,41 @@ module tb_plugin;
 
         // FINAL REPORT
         $display("");
-        $display("╔══════════════════════════════════════════════════════════════════════╗");
-        $display("║        GridX + MemoryMesh  FULL ARCHITECTURE BENCHMARK REPORT        ║");
-        $display("╠══════════════════════════════════════════════════════════════════════╣");
-        $display("║  Arch  : 16x16x16 = 4096 cores, 131072 threads, 4GHz NoC             ║");
-        $display("║  Clock : 1900 MHz boost (sim @ 500 MHz)  OC: +150C +300M +75mV       ║");
-        $display("╠═══════╦══════════════════════╦══════════╦═════════╦════════╦════════ ╣");
-        $display("║  KID  ║  Kernel              ║  Cycles  ║ HBM_RD  ║ HBM_WR ║ Status  ║");
-        $display("╠═══════╬══════════════════════╬══════════╬═════════╬════════╬════════ ╣");
-        $display("║  K0   ║ VECTOR_INIT          ║ %8d ║ %7d ║%7d ║  %s  ║",
+        $display("????????????????????????????????????????????????????????????????????????");
+        $display("?        GridX + MemoryMesh  FULL ARCHITECTURE BENCHMARK REPORT        ?");
+        $display("????????????????????????????????????????????????????????????????????????");
+        $display("?  Arch  : 16x16x16 = 4096 cores, 131072 threads, 4GHz NoC             ?");
+        $display("?  Clock : 1900 MHz boost (sim @ 500 MHz)  OC: +150C +300M +75mV       ?");
+        $display("?????????????????????????????????????????????????????????????????????? ?");
+        $display("?  KID  ?  Kernel              ?  Cycles  ? HBM_RD  ? HBM_WR ? Status  ?");
+        $display("?????????????????????????????????????????????????????????????????????? ?");
+        $display("?  K0   ? VECTOR_INIT          ? %8d ? %7d ?%7d ?  %s  ?",
             k_cycles[0], k_hbm_rd_snap[0], k_hbm_wr_snap[0],
             done_seen ? "PASS" : "FAIL");
-        $display("║  K1   ║ WAVE2_FULL_COVER      ║ %8d ║ %7d ║%7d ║  %s  ║",
+        $display("?  K1   ? WAVE2_FULL_COVER      ? %8d ? %7d ?%7d ?  %s  ?",
             k_cycles[1], k_hbm_rd_snap[1], k_hbm_wr_snap[1],
             (k_cycles[1] > 0) ? "PASS" : "FAIL");
-        $display("║  K2   ║ ALU_COMPUTE_BLAST     ║ %8d ║ %7d ║%7d ║  %s  ║",
+        $display("?  K2   ? ALU_COMPUTE_BLAST     ? %8d ? %7d ?%7d ?  %s  ?",
             k_cycles[2], k_hbm_rd_snap[2], k_hbm_wr_snap[2],
             (k_cycles[2] > 0) ? "PASS" : "FAIL");
-        $display("║  K3   ║ MEMORY_STORM_HBM      ║ %8d ║ %7d ║%7d ║  %s  ║",
+        $display("?  K3   ? MEMORY_STORM_HBM      ? %8d ? %7d ?%7d ?  %s  ?",
             k_cycles[3], k_hbm_rd_snap[3], k_hbm_wr_snap[3],
             (k_hbm_rd_snap[3]>0||k_hbm_wr_snap[3]>0||k_flits_snap[3]>0) ? "PASS" : "FAIL");
-        $display("║  K4   ║ SINGLE_CORE_SANITY    ║ %8d ║ %7d ║%7d ║  %s  ║",
+        $display("?  K4   ? SINGLE_CORE_SANITY    ? %8d ? %7d ?%7d ?  %s  ?",
             k_cycles[4], k_hbm_rd_snap[4], k_hbm_wr_snap[4],
             (k_cycles[4] > 0) ? "PASS" : "FAIL");
-        $display("║  K5   ║ STRESS_MAX_OCC        ║ %8d ║ %7d ║%7d ║  %s  ║",
+        $display("?  K5   ? STRESS_MAX_OCC        ? %8d ? %7d ?%7d ?  %s  ?",
             k_cycles[5], k_hbm_rd_snap[5], k_hbm_wr_snap[5],
             (k_cycles[5] > 0) ? "PASS" : "FAIL");
-        $display("╠═══════╩══════════════════════╩══════════╩═════════╩════════╩════════ ╣");
-        $display("║  Total HBM Reads  : %0d", hbm_reads);
-        $display("║  Total HBM Writes : %0d", hbm_writes);
-        $display("║  Total NoC Flits  : %0d", total_flits_forwarded);
-        $display("║  Total Sim Cycles : %0d", cycle_count);
-        $display("╠══════════════════════════════════════════════════════════════════════╣");
-        $display("║  PASS: %0d / 6   FAIL: %0d / 6", pass_count, fail_count);
-        $display("║  OVERALL: %s", (fail_count == 0) ? "ALL PASS ✓" : "PARTIAL / FAILED ✗");
-        $display("╚══════════════════════════════════════════════════════════════════════╝");
+        $display("?????????????????????????????????????????????????????????????????????? ?");
+        $display("?  Total HBM Reads  : %0d", hbm_reads);
+        $display("?  Total HBM Writes : %0d", hbm_writes);
+        $display("?  Total NoC Flits  : %0d", total_flits_forwarded);
+        $display("?  Total Sim Cycles : %0d", cycle_count);
+        $display("????????????????????????????????????????????????????????????????????????");
+        $display("?  PASS: %0d / 6   FAIL: %0d / 6", pass_count, fail_count);
+        $display("?  OVERALL: %s", (fail_count == 0) ? "ALL PASS ?" : "PARTIAL / FAILED ?");
+        $display("????????????????????????????????????????????????????????????????????????");
         $display("");
 
         $finish;

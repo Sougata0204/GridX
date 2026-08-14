@@ -52,7 +52,7 @@ module tb_gridx;
         .MESH_X(1),
         .MESH_Y(1)
     ) dut (
-        .clk(clk),
+        .clkSys(clk),
         .reset(reset),
         .start(start),
         .done(done),

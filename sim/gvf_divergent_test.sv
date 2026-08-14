@@ -32,21 +32,21 @@ module gvf_divergent_test;
     reg [DATA_BITS-1:0] dmem_wr_data=0;
     wire [DATA_BITS-1:0] dmem_rd_data;
 
-    gridx_kernel_top #(
+    gridxKernelTop #(
         .CUBE_X(1), .CUBE_Y(1), .CUBE_Z(1),
         .PMEM_DEPTH(PMEM_DEPTH), .DMEM_DEPTH(DMEM_DEPTH),
         .SIM_TIMEOUT_CYCLES(TIMEOUT)
     ) dut (
-        .clk_sys(clk), .rst_n(rst_n),
-        .host_wr_en(host_wr_en), .host_wr_data(host_wr_data), .host_start(host_start),
-        .kernel_done(kernel_done), .kernel_fault(kernel_fault), .kernel_state_o(kernel_state),
-        .perf_hbm_reads(perf_hbm_reads), .perf_hbm_writes(perf_hbm_writes),
-        .perf_total_flits(perf_total_flits), .perf_cycle_count(perf_cycle_count),
-        .perf_active_cores(perf_active_cores),
-        .dbg_core_done_sample(dbg_core_done_sample), .dbg_mesh_busy(dbg_mesh_busy),
-        .pmem_wr_en(pmem_wr_en), .pmem_wr_addr(pmem_wr_addr), .pmem_wr_data(pmem_wr_data),
-        .dmem_wr_en(dmem_wr_en), .dmem_wr_addr(dmem_wr_addr), .dmem_wr_data(dmem_wr_data),
-        .dmem_rd_en(dmem_rd_en), .dmem_rd_addr(dmem_rd_addr), .dmem_rd_data(dmem_rd_data)
+        .clkSys(clk), .rstN(rst_n),
+        .hostWrEn(host_wr_en), .hostWrData(host_wr_data), .hostStart(host_start),
+        .kernelDone(kernel_done), .kernelFault(kernel_fault), .kernelStateO(kernel_state),
+        .perfHbmReads(perf_hbm_reads), .perfHbmWrites(perf_hbm_writes),
+        .perfTotalFlits(perf_total_flits), .perfCycleCount(perf_cycle_count),
+        .perfActiveCores(perf_active_cores),
+        .dbgCoreDoneSample(dbg_core_done_sample), .dbgMeshBusy(dbg_mesh_busy),
+        .pmemWrEn(pmem_wr_en), .pmemWrAddr(pmem_wr_addr), .pmemWrData(pmem_wr_data),
+        .dmemWrEn(dmem_wr_en), .dmemWrAddr(dmem_wr_addr), .dmemWrData(dmem_wr_data),
+        .dmemRdEn(dmem_rd_en), .dmemRdAddr(dmem_rd_addr), .dmemRdData(dmem_rd_data)
     );
 
     function [15:0] enc_const(input [3:0] rd, input [7:0] imm);
@@ -75,12 +75,12 @@ module gvf_divergent_test;
     endtask
 
     initial begin
-        $display("[GRIDX3_CONFIG] Core Clock Frequency: %0d MHz (%0d ps period)", gridx_config_pkg::CFG_CORE_FREQ_MHZ, gridx_config_pkg::CFG_CORE_PERIOD_PS);
-        $display("[GRIDX3_CONFIG] TSV Bundle Width: %0d bits", gridx_config_pkg::CFG_TSV_DATA_WIDTH);
-        $display("[GRIDX3_CONFIG] TSV Bundles per Core Column: %0d", gridx_config_pkg::CFG_TSV_BUNDLES_PER_CORE);
-        $display("[GRIDX3_CONFIG] TSV Aggregate Bits per Cycle: %0d bits/cycle (%0d Bytes/cycle)", gridx_config_pkg::CFG_TSV_AGGREGATE_BW, gridx_config_pkg::CFG_TSV_AGGREGATE_BW/8);
-        $display("[GRIDX3_CONFIG] Calculated Vertical Bandwidth: %0d GB/s (6.144 TB/s)", (gridx_config_pkg::CFG_TSV_AGGREGATE_BW / 8) * (gridx_config_pkg::CFG_CORE_FREQ_MHZ / 1000));
-        $display("[GRIDX3_CONFIG] NoC Flit Width (Row Direction): %0d bits", gridx_config_pkg::CFG_NOC_FLIT_WIDTH);
+        $display("[GRIDX3_CONFIG] Core Clock Frequency: %0d MHz (%0d ps period)", gridxConfigPkg::CFG_CORE_FREQ_MHZ, gridxConfigPkg::CFG_CORE_PERIOD_PS);
+        $display("[GRIDX3_CONFIG] TSV Bundle Width: %0d bits", gridxConfigPkg::CFG_TSV_DATA_WIDTH);
+        $display("[GRIDX3_CONFIG] TSV Bundles per Core Column: %0d", gridxConfigPkg::CFG_TSV_BUNDLES_PER_CORE);
+        $display("[GRIDX3_CONFIG] TSV Aggregate Bits per Cycle: %0d bits/cycle (%0d Bytes/cycle)", gridxConfigPkg::CFG_TSV_AGGREGATE_BW, gridxConfigPkg::CFG_TSV_AGGREGATE_BW/8);
+        $display("[GRIDX3_CONFIG] Calculated Vertical Bandwidth: %0d GB/s (6.144 TB/s)", (gridxConfigPkg::CFG_TSV_AGGREGATE_BW / 8) * (gridxConfigPkg::CFG_CORE_FREQ_MHZ / 1000));
+        $display("[GRIDX3_CONFIG] NoC Flit Width (Row Direction): %0d bits", gridxConfigPkg::CFG_NOC_FLIT_WIDTH);
         $display("[GRIDX3_TEST] Divergent Branch Test: 4 threads, 1 block, 1 core");
         rst_n = 0; repeat(20) @(posedge clk); rst_n = 1; repeat(5) @(posedge clk);
 
@@ -152,6 +152,7 @@ module gvf_divergent_test;
                 read_dmem({12'b0, BRAM_IDX} + tid);
                 got = dmem_rd_data;
                 expected = (tid % 2 == 0) ? 8'd10 : 8'd20;
+                if (got == expected)
                     $display("  [PASS] thread %0d: DMEM[%0d] = 0x%02h (expected 0x%02h)", tid, BRAM_IDX+tid, got, expected);
                 else
                     $display("  [FAIL] thread %0d: DMEM[%0d] = 0x%02h (expected 0x%02h)", tid, BRAM_IDX+tid, got, expected);

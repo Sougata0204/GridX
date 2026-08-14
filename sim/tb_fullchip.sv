@@ -44,7 +44,7 @@ module tb_fullchip;
     wire [7:0]  dbg_core_done_sample;
     wire        dbg_mesh_busy;
 
-    gridx_kernel_top #(
+    gridxKernelTop #(
         .CUBE_X(4), .CUBE_Y(4), .CUBE_Z(4),
         .THREADS_PER_BLOCK(32),
         .WARPS_PER_CORE(4),
@@ -52,30 +52,30 @@ module tb_fullchip;
         .DMEM_DEPTH(8192),
         .SIM_TIMEOUT_CYCLES(500_000)
     ) dut (
-        .clk_sys(clk),
-        .rst_n(rst_n),
-        .host_wr_en(host_wr_en),
-        .host_wr_data(host_wr_data),
-        .host_start(host_start),
-        .kernel_done(kernel_done),
-        .kernel_fault(kernel_fault),
-        .kernel_state_o(kernel_state_o),
-        .perf_hbm_reads(perf_hbm_reads),
-        .perf_hbm_writes(perf_hbm_writes),
-        .perf_total_flits(perf_total_flits),
-        .perf_cycle_count(perf_cycle_count),
-        .perf_active_cores(perf_active_cores),
-        .dbg_core_done_sample(dbg_core_done_sample),
-        .dbg_mesh_busy(dbg_mesh_busy),
-        .pmem_wr_en(pmem_wr_en),
-        .pmem_wr_addr(pmem_wr_addr),
-        .pmem_wr_data(pmem_wr_data),
-        .dmem_wr_en(dmem_wr_en),
-        .dmem_wr_addr(dmem_wr_addr),
-        .dmem_wr_data(dmem_wr_data),
-        .dmem_rd_en(dmem_rd_en),
-        .dmem_rd_addr(dmem_rd_addr),
-        .dmem_rd_data(dmem_rd_data)
+        .clkSys(clk),
+        .rstN(rst_n),
+        .hostWrEn(host_wr_en),
+        .hostWrData(host_wr_data),
+        .hostStart(host_start),
+        .kernelDone(kernel_done),
+        .kernelFault(kernel_fault),
+        .kernelStateO(kernel_state_o),
+        .perfHbmReads(perf_hbm_reads),
+        .perfHbmWrites(perf_hbm_writes),
+        .perfTotalFlits(perf_total_flits),
+        .perfCycleCount(perf_cycle_count),
+        .perfActiveCores(perf_active_cores),
+        .dbgCoreDoneSample(dbg_core_done_sample),
+        .dbgMeshBusy(dbg_mesh_busy),
+        .pmemWrEn(pmem_wr_en),
+        .pmemWrAddr(pmem_wr_addr),
+        .pmemWrData(pmem_wr_data),
+        .dmemWrEn(dmem_wr_en),
+        .dmemWrAddr(dmem_wr_addr),
+        .dmemWrData(dmem_wr_data),
+        .dmemRdEn(dmem_rd_en),
+        .dmemRdAddr(dmem_rd_addr),
+        .dmemRdData(dmem_rd_data)
     );
 
     // Test tracking
@@ -268,7 +268,7 @@ module tb_fullchip;
         check(!kernel_fault, "No kernel fault");
 
         // DMEM_DEPTH=8192: addr = (0xFF80+tid) & 0x1FFF = 8064+tid
-        // even tid → 10 (0x0A), odd tid → 20 (0x14)
+        // even tid ? 10 (0x0A), odd tid ? 20 (0x14)
 
         for (i = 0; i < 32; i = i + 1) begin
             read_dmem(22'd8064 + i, rd_val);
@@ -396,10 +396,10 @@ module tb_fullchip;
         // Section 11: AXI4 Bus & Memory Bandwidth
         section_start("11. AXI4 Bus & Memory Bandwidth Analysis");
 
-        // On-chip BRAM bandwidth: 8-bit data × 1 access/cycle × 4 GHz = 4 GB/s per core, 256 GB/s total
-        // Memory Sheets: 8-bit × 4 banks × 3 ports × 4 GHz = 48 GB/s per sheet, 48 sheets = 2.304 TB/s
-        // HBM3 via AXI4: 512-bit × 4 nodes × 4 GHz = 1.024 TB/s
-        // MemoryMesh NoC: 256-bit flits × 80 nodes × 4 GHz = 10.24 TB/s bisection
+        // On-chip BRAM bandwidth: 8-bit data ? 1 access/cycle ? 4 GHz = 4 GB/s per core, 256 GB/s total
+        // Memory Sheets: 8-bit ? 4 banks ? 3 ports ? 4 GHz = 48 GB/s per sheet, 48 sheets = 2.304 TB/s
+        // HBM3 via AXI4: 512-bit ? 4 nodes ? 4 GHz = 1.024 TB/s
+        // MemoryMesh NoC: 256-bit flits ? 80 nodes ? 4 GHz = 10.24 TB/s bisection
         check(1, "On-chip BRAM: 4 GB/s/core, 256 GB/s aggregate (64 cores)");
         check(1, "Memory Sheets: 48 GB/s/sheet, 2.304 TB/s aggregate (48 X-sheets)");
         check(1, "HBM3 via AXI4: 256 GB/s/node, 1.024 TB/s aggregate (4 AXI4 nodes)");

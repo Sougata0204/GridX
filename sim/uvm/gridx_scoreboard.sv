@@ -1,4 +1,4 @@
-﻿// GridX3 UVM Scoreboard
+// GridX3 UVM Scoreboard
 // Golden reference model and data integrity checker.
 
 `ifndef GRIDX_SCOREBOARD_SV

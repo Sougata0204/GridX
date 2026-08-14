@@ -92,6 +92,11 @@ module directoryController #(
     reg [4:0] snoopAckCnt;
     reg [8:0] snoopTimeout;
     
+    // Staging registers for deferred state commits during WAIT_SNOOP
+    reg [2:0] pendingNewState;
+    reg [CORE_ID_WIDTH-1:0] pendingNewOwner;
+    reg [NUM_CORES-1:0] pendingNewSharers;
+    
     wire matchComb = validArray[lookupIdx] && (tagArray[lookupIdx] == latchedReqAddr);
     wire [2:0] lineStateComb = matchComb ? stateArray[lookupIdx] : STATE_I;
     wire [NUM_CORES-1:0] sharersComb = matchComb ? sharersArray[lookupIdx] : 0;
@@ -193,9 +198,10 @@ module directoryController #(
                                     snoopTimeout <= 0;
                                     state <= WAIT_SNOOP;
                                     
-                                    // Downgrade M to O, O stays O
-                                    if (lineStateComb == STATE_M) stateArray[lookupIdx] <= STATE_O;
-                                    sharersArray[lookupIdx] <= sharersComb | (1 << latchedReqCoreId);
+                                    // Stage the state update (Downgrade M to O, O stays O)
+                                    pendingNewState <= STATE_O;
+                                    pendingNewOwner <= ownerArray[lookupIdx];
+                                    pendingNewSharers <= sharersComb | (1 << latchedReqCoreId);
                                 end else begin
                                     // State S or E
                                     if (lineStateComb == STATE_E) stateArray[lookupIdx] <= STATE_S;
@@ -221,17 +227,22 @@ module directoryController #(
                                     snoopTimeout <= 0;
                                     perfInvalidations <= perfInvalidations + 1;
                                     state <= WAIT_SNOOP;
+                                    
+                                    // Stage the state update
+                                    pendingNewState <= STATE_M;
+                                    pendingNewOwner <= latchedReqCoreId;
+                                    pendingNewSharers <= 0;
                                 end else begin
                                     respValid <= 1;
                                     respType <= RESP_ACK;
                                     respCoreId <= latchedReqCoreId;
                                     state <= IDLE;
                                     reqReady <= 1;
+                                    
+                                    stateArray[lookupIdx] <= STATE_M;
+                                    ownerArray[lookupIdx] <= latchedReqCoreId;
+                                    sharersArray[lookupIdx] <= 0;
                                 end
-                                
-                                stateArray[lookupIdx] <= STATE_M;
-                                ownerArray[lookupIdx] <= latchedReqCoreId;
-                                sharersArray[lookupIdx] <= 0;
                             end
                             
                             REQ_WRITEBACK: begin
@@ -266,6 +277,11 @@ module directoryController #(
                             respCoreId <= latchedReqCoreId;
                             state <= IDLE;
                             reqReady <= 1;
+                            
+                            // Apply pending state update
+                            stateArray[lookupIdx] <= pendingNewState;
+                            ownerArray[lookupIdx] <= pendingNewOwner;
+                            sharersArray[lookupIdx] <= pendingNewSharers;
                         end else begin
                             if (snoopAckCnt + 1 == snoopExpected) begin
                                 respValid <= 1;
@@ -273,6 +289,11 @@ module directoryController #(
                                 respCoreId <= latchedReqCoreId;
                                 state <= IDLE;
                                 reqReady <= 1;
+                                
+                                // Apply pending state update now that invalidations are complete
+                                stateArray[lookupIdx] <= pendingNewState;
+                                ownerArray[lookupIdx] <= pendingNewOwner;
+                                sharersArray[lookupIdx] <= pendingNewSharers;
                             end
                         end
                     end else if (snoopTimeout >= 256) begin

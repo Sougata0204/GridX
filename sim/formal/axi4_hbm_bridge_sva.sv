@@ -12,39 +12,39 @@ module axi4_hbm_bridge_sva #(
     input wire reset,
 
     // Write Address Channel
-    input wire [ID_WIDTH-1:0]   s_awid,
-    input wire [ADDR_WIDTH-1:0] s_awaddr,
-    input wire                  s_awvalid,
-    input wire                  s_awready,
+    input wire [ID_WIDTH-1:0]   sAwid,
+    input wire [ADDR_WIDTH-1:0] sAwaddr,
+    input wire                  sAwvalid,
+    input wire                  sAwready,
 
     // Write Data Channel
-    input wire                  s_wvalid,
-    input wire                  s_wready,
+    input wire                  sWvalid,
+    input wire                  sWready,
 
     // Write Response Channel
-    input wire                  s_bvalid,
-    input wire                  s_bready,
+    input wire                  sBvalid,
+    input wire                  sBready,
 
     // Read Address Channel
-    input wire [ID_WIDTH-1:0]   s_arid,
-    input wire [ADDR_WIDTH-1:0] s_araddr,
-    input wire                  s_arvalid,
-    input wire                  s_arready,
+    input wire [ID_WIDTH-1:0]   sArid,
+    input wire [ADDR_WIDTH-1:0] sAraddr,
+    input wire                  sArvalid,
+    input wire                  sArready,
 
     // Read Data Channel
-    input wire                  s_rvalid,
-    input wire                  s_rready,
+    input wire                  sRvalid,
+    input wire                  sRready,
 
     // Native HBM Interface
-    input wire                  hbm_req_valid,
-    input wire                  hbm_req_ready,
-    input wire                  hbm_resp_valid
+    input wire                  hbmReqValid,
+    input wire                  hbmReqReady,
+    input wire                  hbmRespValid
 );
 
     // 1. AXI4 AWVALID stability until AWREADY
     property p_aw_valid_stable;
         @(posedge clk) disable iff (reset)
-        (s_awvalid && !s_awready) |=> s_awvalid;
+        (sAwvalid && !sAwready) |=> sAwvalid;
     endproperty
     assert property (p_aw_valid_stable)
         else $error("AXI4 SVA ERROR: s_awvalid dropped before s_awready");
@@ -52,7 +52,7 @@ module axi4_hbm_bridge_sva #(
     // 2. AXI4 ARVALID stability until ARREADY
     property p_ar_valid_stable;
         @(posedge clk) disable iff (reset)
-        (s_arvalid && !s_arready) |=> s_arvalid;
+        (sArvalid && !sArready) |=> sArvalid;
     endproperty
     assert property (p_ar_valid_stable)
         else $error("AXI4 SVA ERROR: s_arvalid dropped before s_arready");
@@ -60,7 +60,7 @@ module axi4_hbm_bridge_sva #(
     // 3. AXI4 WVALID stability until WREADY
     property p_w_valid_stable;
         @(posedge clk) disable iff (reset)
-        (s_wvalid && !s_wready) |=> s_wvalid;
+        (sWvalid && !sWready) |=> sWvalid;
     endproperty
     assert property (p_w_valid_stable)
         else $error("AXI4 SVA ERROR: s_wvalid dropped before s_wready");
@@ -68,7 +68,7 @@ module axi4_hbm_bridge_sva #(
     // 4. Native HBM Request Handshake
     property p_hbm_req_handshake;
         @(posedge clk) disable iff (reset)
-        (hbm_req_valid && !hbm_req_ready) |=> hbm_req_valid;
+        (hbmReqValid && !hbmReqReady) |=> hbmReqValid;
     endproperty
     assert property (p_hbm_req_handshake)
         else $error("AXI4 SVA ERROR: hbm_req_valid dropped before hbm_req_ready");

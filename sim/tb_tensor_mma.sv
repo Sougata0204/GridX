@@ -22,7 +22,7 @@ module tb_tensor_mma;
     wire [2:0] fill;
 
     tensorUnitPipelined dut (
-        .clk(clk), .reset(reset), .start(start),
+        .clkSys(clk), .reset(reset), .start(start),
         .matrixA(matrix_a), .matrixB(matrix_b), .matrixC(matrix_c),
         .tagIn(tag_in),
         .ready(ready), .done(done), .matrixD(matrix_d),

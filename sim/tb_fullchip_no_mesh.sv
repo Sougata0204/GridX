@@ -1,10 +1,10 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-// ╔══════════════════════════════════════════════════════════════════════╗
-// ║  GridX 2×2×2 Full Chip Verification (Without MemoryMesh)           ║
-// ║  Cores + Local BRAM + HBM3 — 250MHz per-layer clocks              ║
-// ╚══════════════════════════════════════════════════════════════════════╝
+// ????????????????????????????????????????????????????????????????????????
+// ?  GridX 2?2?2 Full Chip Verification (Without MemoryMesh)           ?
+// ?  Cores + Local BRAM + HBM3 ? 250MHz per-layer clocks              ?
+// ????????????????????????????????????????????????????????????????????????
 
 module tb_fullchip_no_mesh;
 
@@ -27,9 +27,9 @@ module tb_fullchip_no_mesh;
     localparam [2:0] K_RESET=0, K_CONFIG=1, K_LAUNCH=2, K_RUNNING=3,
                      K_DRAIN=4, K_DONE=5, K_FAULT=6;
 
-    // ═════════════════════════════════════════════════════════════
+    // ?????????????????????????????????????????????????????????????
     //  CLOCKS & RESET
-    // ═════════════════════════════════════════════════════════════
+    // ?????????????????????????????????????????????????????????????
     reg clk = 0;
     always #(CLK_PERIOD/2) clk = ~clk;
     reg [CUBE_Z-1:0] clk_layer;
@@ -42,9 +42,9 @@ module tb_fullchip_no_mesh;
     end
     reg rst_n = 0;
 
-    // ═════════════════════════════════════════════════════════════
+    // ?????????????????????????????????????????????????????????????
     //  DUT SIGNALS
-    // ═════════════════════════════════════════════════════════════
+    // ?????????????????????????????????????????????????????????????
     reg host_wr_en = 0;
     reg [15:0] host_wr_data = 0;
     reg host_start = 0;
@@ -81,9 +81,9 @@ module tb_fullchip_no_mesh;
         .dmemRdEn(dmem_rd_en), .dmemRdAddr(dmem_rd_addr), .dmemRdData(dmem_rd_data)
     );
 
-    // ═════════════════════════════════════════════════════════════
+    // ?????????????????????????????????????????????????????????????
     //  TEST INFRASTRUCTURE
-    // ═════════════════════════════════════════════════════════════
+    // ?????????????????????????????????????????????????????????????
     integer tests_run = 0, tests_pass = 0, tests_fail = 0;
     integer cycle_cnt = 0;
 
@@ -130,21 +130,21 @@ module tb_fullchip_no_mesh;
         enc_const = {OP_CONST, rd, imm};
     endfunction
 
-    // ═════════════════════════════════════════════════════════════
+    // ?????????????????????????????????????????????????????????????
     //  MAIN TEST SEQUENCE
-    // ═════════════════════════════════════════════════════════════
+    // ?????????????????????????????????????????????????????????????
     initial begin
         integer i;
 
         $display("");
-        $display("╔══════════════════════════════════════════════════════════════════╗");
-        $display("║  GridX 2x2x2 Full Chip Verification (No MemoryMesh)            ║");
-        $display("║  8 Cores | HBM3 | 250MHz Per-Layer GALS Clocks                 ║");
-        $display("╚══════════════════════════════════════════════════════════════════╝");
+        $display("????????????????????????????????????????????????????????????????????");
+        $display("?  GridX 2x2x2 Full Chip Verification (No MemoryMesh)            ?");
+        $display("?  8 Cores | HBM3 | 250MHz Per-Layer GALS Clocks                 ?");
+        $display("????????????????????????????????????????????????????????????????????");
         $display("");
 
-        // ═══ STAGE 1: Reset Verification ═══
-        $display("═══ STAGE 1: Reset & Infrastructure ═══");
+        // ??? STAGE 1: Reset Verification ???
+        $display("??? STAGE 1: Reset & Infrastructure ???");
         do_reset();
         gvf_check(kernel_state == K_RESET, "kernel_state = RESET after reset");
         gvf_check(!kernel_done,            "kernel_done = 0 after reset");
@@ -152,9 +152,9 @@ module tb_fullchip_no_mesh;
         gvf_check(clk_layer[0] !== 1'bx,   "Layer 0 clock alive");
         gvf_check(clk_layer[1] !== 1'bx,   "Layer 1 clock alive");
 
-        // ═══ STAGE 2: Single Thread RET ═══
+        // ??? STAGE 2: Single Thread RET ???
         $display("");
-        $display("═══ STAGE 2: Single Thread RET ═══");
+        $display("??? STAGE 2: Single Thread RET ???");
         do_reset();
         write_pmem(0, {OP_RET, 12'h000});
         repeat(2) @(posedge clk);
@@ -166,9 +166,9 @@ module tb_fullchip_no_mesh;
         gvf_check(!kernel_fault, "1T RET: no fault");
         $display("  [INFO] 1T RET completed in %0d cycles", cycle_cnt);
 
-        // ═══ STAGE 3: 4-Thread NOP+RET ═══
+        // ??? STAGE 3: 4-Thread NOP+RET ???
         $display("");
-        $display("═══ STAGE 3: 4-Thread NOP+RET ═══");
+        $display("??? STAGE 3: 4-Thread NOP+RET ???");
         do_reset();
         write_pmem(0, {OP_NOP, 12'h000});
         write_pmem(1, {OP_RET, 12'h000});
@@ -179,9 +179,9 @@ module tb_fullchip_no_mesh;
         gvf_check(!kernel_fault, "4T NOP+RET: no fault");
         $display("  [INFO] 4T NOP+RET in %0d cycles", cycle_cnt);
 
-        // ═══ STAGE 4: ALU Compute (4T) ═══
+        // ??? STAGE 4: ALU Compute (4T) ???
         $display("");
-        $display("═══ STAGE 4: ALU Compute (CONST+ADD+MUL+RET) ═══");
+        $display("??? STAGE 4: ALU Compute (CONST+ADD+MUL+RET) ???");
         do_reset();
         write_pmem(0, enc_const(4'h0, 8'h07));         // r0 = 7
         write_pmem(1, enc_const(4'h1, 8'h03));         // r1 = 3
@@ -196,9 +196,9 @@ module tb_fullchip_no_mesh;
         gvf_check(!kernel_fault, "4T ALU: no fault");
         $display("  [INFO] 4T ALU in %0d cycles", cycle_cnt);
 
-        // ═══ STAGE 5: Multi-Core (8T = 2 blocks) ═══
+        // ??? STAGE 5: Multi-Core (8T = 2 blocks) ???
         $display("");
-        $display("═══ STAGE 5: Multi-Core 8T (2 blocks x 4 threads) ═══");
+        $display("??? STAGE 5: Multi-Core 8T (2 blocks x 4 threads) ???");
         do_reset();
         write_pmem(0, enc_const(4'h0, 8'h42));
         write_pmem(1, enc_const(4'h1, 8'h05));
@@ -211,9 +211,9 @@ module tb_fullchip_no_mesh;
         gvf_check(!kernel_fault, "8T multicore: no fault");
         $display("  [INFO] 8T multicore in %0d cycles", cycle_cnt);
 
-        // ═══ STAGE 6: Full 8-core (32T = 8 blocks) ═══
+        // ??? STAGE 6: Full 8-core (32T = 8 blocks) ???
         $display("");
-        $display("═══ STAGE 6: Full 8-Core (32T = 8 blocks) ═══");
+        $display("??? STAGE 6: Full 8-Core (32T = 8 blocks) ???");
         do_reset();
         write_pmem(0, enc_const(4'h0, 8'hAA));
         write_pmem(1, enc_const(4'h1, 8'h55));
@@ -227,9 +227,9 @@ module tb_fullchip_no_mesh;
         gvf_check(!kernel_fault, "32T full 8-core: no fault");
         $display("  [INFO] 32T full 8-core in %0d cycles", cycle_cnt);
 
-        // ═══ STAGE 7: ALU Stress (DIV chain, 16T) ═══
+        // ??? STAGE 7: ALU Stress (DIV chain, 16T) ???
         $display("");
-        $display("═══ STAGE 7: ALU Stress (DIV chain, 16T) ═══");
+        $display("??? STAGE 7: ALU Stress (DIV chain, 16T) ???");
         do_reset();
         write_pmem(0, enc_const(4'h0, 8'hFF));
         write_pmem(1, enc_const(4'h1, 8'h02));
@@ -245,9 +245,9 @@ module tb_fullchip_no_mesh;
         gvf_check(!kernel_fault, "16T DIV stress: no fault");
         $display("  [INFO] 16T DIV stress in %0d cycles", cycle_cnt);
 
-        // ═══ STAGE 8: NOP Sled (16 NOPs + RET, 8T) ═══
+        // ??? STAGE 8: NOP Sled (16 NOPs + RET, 8T) ???
         $display("");
-        $display("═══ STAGE 8: NOP Sled (16 NOPs + RET, 8T) ═══");
+        $display("??? STAGE 8: NOP Sled (16 NOPs + RET, 8T) ???");
         do_reset();
         for (i = 0; i < 16; i = i + 1)
             write_pmem(i[11:0], {OP_NOP, 12'h000});
@@ -259,9 +259,9 @@ module tb_fullchip_no_mesh;
         gvf_check(!kernel_fault, "8T NOP sled: no fault");
         $display("  [INFO] 8T NOP sled in %0d cycles", cycle_cnt);
 
-        // ═══ STAGE 9: Back-to-Back Kernel Launches ═══
+        // ??? STAGE 9: Back-to-Back Kernel Launches ???
         $display("");
-        $display("═══ STAGE 9: Back-to-Back Kernel Launches (5x) ═══");
+        $display("??? STAGE 9: Back-to-Back Kernel Launches (5x) ???");
         for (i = 0; i < 5; i = i + 1) begin
             do_reset();
             write_pmem(0, enc_const(4'h0, i[7:0]));
@@ -274,9 +274,9 @@ module tb_fullchip_no_mesh;
         end
         $display("  [INFO] All 5 back-to-back kernels passed");
 
-        // ═══ STAGE 10: Thread Scaling Sweep ═══
+        // ??? STAGE 10: Thread Scaling Sweep ???
         $display("");
-        $display("═══ STAGE 10: Thread Scaling Sweep ═══");
+        $display("??? STAGE 10: Thread Scaling Sweep ???");
         begin
             integer thread_counts [7:0];
             thread_counts[0] = 1;  thread_counts[1] = 2;
@@ -303,9 +303,9 @@ module tb_fullchip_no_mesh;
             end
         end
 
-        // ═══ STAGE 11: FSM State Coverage ═══
+        // ??? STAGE 11: FSM State Coverage ???
         $display("");
-        $display("═══ STAGE 11: FSM Lifecycle Verification ═══");
+        $display("??? STAGE 11: FSM Lifecycle Verification ???");
         do_reset();
         gvf_check(kernel_state == K_RESET, "FSM: RESET");
         write_pmem(0, {OP_RET, 12'h000});
@@ -318,9 +318,9 @@ module tb_fullchip_no_mesh;
         gvf_check(kernel_state >= K_DRAIN, "FSM: DRAIN/DONE");
         gvf_check(kernel_done, "FSM: kernel_done final");
 
-        // ═══ STAGE 12: Performance & HBM Counters ═══
+        // ??? STAGE 12: Performance & HBM Counters ???
         $display("");
-        $display("═══ STAGE 12: Performance Counters ═══");
+        $display("??? STAGE 12: Performance Counters ???");
         $display("  HBM Reads:     %0d", perf_hbm_reads);
         $display("  HBM Writes:    %0d", perf_hbm_writes);
         $display("  Total Flits:   %0d", perf_total_flits);
@@ -328,19 +328,19 @@ module tb_fullchip_no_mesh;
         $display("  Active Cores:  %0d", perf_active_cores);
         $display("  Mesh Busy:     %0b", dbg_mesh_busy);
 
-        // ═══ FINAL REPORT ═══
+        // ??? FINAL REPORT ???
         $display("");
-        $display("╔══════════════════════════════════════════════════════════════════╗");
-        $display("║  FULL CHIP VERIFICATION REPORT                                   ║");
-        $display("╠══════════════════════════════════════════════════════════════════╣");
-        $display("║  Tests Run:    %4d                                              ║", tests_run);
-        $display("║  Tests Passed: %4d                                              ║", tests_pass);
-        $display("║  Tests Failed: %4d                                              ║", tests_fail);
+        $display("????????????????????????????????????????????????????????????????????");
+        $display("?  FULL CHIP VERIFICATION REPORT                                   ?");
+        $display("????????????????????????????????????????????????????????????????????");
+        $display("?  Tests Run:    %4d                                              ?", tests_run);
+        $display("?  Tests Passed: %4d                                              ?", tests_pass);
+        $display("?  Tests Failed: %4d                                              ?", tests_fail);
         if (tests_fail == 0)
-            $display("║  RESULT: ALL TESTS PASSED                                      ║");
+            $display("?  RESULT: ALL TESTS PASSED                                      ?");
         else
-            $display("║  RESULT: %0d FAILURES DETECTED                                  ║", tests_fail);
-        $display("╚══════════════════════════════════════════════════════════════════╝");
+            $display("?  RESULT: %0d FAILURES DETECTED                                  ?", tests_fail);
+        $display("????????????????????????????????????????????????????????????????????");
         $display("");
 
         repeat(10) @(posedge clk);

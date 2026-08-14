@@ -11,21 +11,21 @@ module simt_stack_sva #(
     input wire clk,
     input wire reset,
 
-    input wire branch_valid,
-    input wire [THREADS_PER_WARP-1:0] branch_taken,
-    input wire [THREADS_PER_WARP-1:0] current_active_mask,
+    input wire branchValid,
+    input wire [THREADS_PER_WARP-1:0] branchTaken,
+    input wire [THREADS_PER_WARP-1:0] currentActiveMask,
 
     input wire reconverge,
 
-    input wire stack_empty,
-    input wire stack_full,
-    input wire [$clog2(DEPTH):0] stack_depth
+    input wire stackEmpty,
+    input wire stackFull,
+    input wire [$clog2(DEPTH):0] stackDepth
 );
 
     // 1. Stack Depth Never Exceeds Limit
     property p_stack_depth_limit;
         @(posedge clk) disable iff (reset)
-        stack_depth <= DEPTH;
+        stackDepth <= DEPTH;
     endproperty
     assert property (p_stack_depth_limit)
         else $error("SIMT SVA ERROR: Stack depth overflowed max DEPTH");
@@ -33,7 +33,7 @@ module simt_stack_sva #(
     // 2. Stack Empty Flag Consistency
     property p_stack_empty_flag;
         @(posedge clk) disable iff (reset)
-        stack_empty <-> (stack_depth == 0);
+        stackEmpty <-> (stackDepth == 0);
     endproperty
     assert property (p_stack_empty_flag)
         else $error("SIMT SVA ERROR: Mismatch between stack_empty flag and stack_depth");
@@ -41,7 +41,7 @@ module simt_stack_sva #(
     // 3. Stack Full Flag Consistency
     property p_stack_full_flag;
         @(posedge clk) disable iff (reset)
-        stack_full <-> (stack_depth >= DEPTH);
+        stackFull <-> (stackDepth >= DEPTH);
     endproperty
     assert property (p_stack_full_flag)
         else $error("SIMT SVA ERROR: Mismatch between stack_full flag and stack_depth");

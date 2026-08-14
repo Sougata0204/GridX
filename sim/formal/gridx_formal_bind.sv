@@ -17,7 +17,7 @@ bind mem_mesh_router mem_mesh_router_sva u_mem_mesh_router_sva (
 );
 
 // Bind SVA to directory_controller
-bind directory_controller directory_controller_sva #(
+bind directoryController directory_controller_sva #(
     .NUM_CORES(NUM_CORES),
     .ADDR_WIDTH(ADDR_WIDTH),
     .DATA_WIDTH(DATA_WIDTH),
@@ -25,60 +25,99 @@ bind directory_controller directory_controller_sva #(
 ) u_directory_controller_sva (
     .clk(clk),
     .reset(reset),
-    .req_valid(req_valid),
-    .req_core_id(req_core_id),
-    .req_addr(req_addr),
-    .req_type(req_type),
-    .req_ready(req_ready),
-    .resp_valid(resp_valid),
-    .resp_core_id(resp_core_id),
-    .resp_type(resp_type),
-    .snoop_valid(snoop_valid),
-    .snoop_core_mask(snoop_core_mask),
-    .snoop_type(snoop_type),
-    .snoop_resp_valid(snoop_resp_valid)
+    .reqValid(reqValid),
+    .reqCoreId(reqCoreId),
+    .reqAddr(reqAddr),
+    .reqType(reqType),
+    .reqReady(reqReady),
+    .respValid(respValid),
+    .respCoreId(respCoreId),
+    .respType(respType),
+    .snoopValid(snoopValid),
+    .snoopCoreMask(snoopCoreMask),
+    .snoopType(snoopType),
+    .snoopRespValid(snoopRespValid)
 );
 
 // Bind SVA to axi4_hbm_bridge
-bind axi4_hbm_bridge axi4_hbm_bridge_sva #(
+bind axi4HbmBridge axi4_hbm_bridge_sva #(
     .ADDR_WIDTH(ADDR_WIDTH),
     .DATA_WIDTH(DATA_WIDTH),
     .ID_WIDTH(ID_WIDTH)
 ) u_axi4_hbm_bridge_sva (
     .clk(clk),
     .reset(reset),
-    .s_awid(s_awid),
-    .s_awaddr(s_awaddr),
-    .s_awvalid(s_awvalid),
-    .s_awready(s_awready),
-    .s_wvalid(s_wvalid),
-    .s_wready(s_wready),
-    .s_bvalid(s_bvalid),
-    .s_bready(s_bready),
-    .s_arid(s_arid),
-    .s_araddr(s_araddr),
-    .s_arvalid(s_arvalid),
-    .s_arready(s_arready),
-    .s_rvalid(s_rvalid),
-    .s_rready(s_rready),
-    .hbm_req_valid(hbm_req_valid),
-    .hbm_req_ready(hbm_req_ready),
-    .hbm_resp_valid(hbm_resp_valid)
+    .sAwid(sAwid),
+    .sAwaddr(sAwaddr),
+    .sAwvalid(sAwvalid),
+    .sAwready(sAwready),
+    .sWvalid(sWvalid),
+    .sWready(sWready),
+    .sBvalid(sBvalid),
+    .sBready(sBready),
+    .sArid(sArid),
+    .sAraddr(sAraddr),
+    .sArvalid(sArvalid),
+    .sArready(sArready),
+    .sRvalid(sRvalid),
+    .sRready(sRready),
+    .hbmReqValid(hbmReqValid),
+    .hbmReqReady(hbmReqReady),
+    .hbmRespValid(hbmRespValid)
 );
 
 // Bind SVA to simt_stack
-bind simt_stack simt_stack_sva #(
+bind simtStack simt_stack_sva #(
     .DEPTH(DEPTH),
     .THREADS_PER_WARP(THREADS_PER_WARP),
     .PC_WIDTH(PC_WIDTH)
 ) u_simt_stack_sva (
     .clk(clk),
     .reset(reset),
-    .branch_valid(branch_valid),
-    .branch_taken(branch_taken),
-    .current_active_mask(current_active_mask),
+    .branchValid(branchValid),
+    .branchTaken(branchTaken),
+    .currentActiveMask(currentActiveMask),
     .reconverge(reconverge),
-    .stack_empty(stack_empty),
-    .stack_full(stack_full),
-    .stack_depth(stack_depth)
+    .stackEmpty(stackEmpty),
+    .stackFull(stackFull),
+    .stackDepth(stackDepth)
+);
+
+// Bind SVA to credit_manager
+bind creditManager credit_manager_sva u_credit_manager_sva (
+    .clk(clk),
+    .reset(reset),
+    .allocValid(allocValid),
+    .allocReady(allocReady),
+    .freeValid(freeValid),
+    .creditsAvailable(creditsAvailable)
+);
+
+// Bind SVA to async_fifo
+bind asyncFifo async_fifo_sva u_async_fifo_sva (
+    .wrClk(wrClk),
+    .wrRst(wrRst),
+    .wrEn(wrEn),
+    .wrFull(wrFull),
+    .rdClk(rdClk),
+    .rdRst(rdRst),
+    .rdEn(rdEn),
+    .rdEmpty(rdEmpty)
+);
+
+// Bind SVA to chi_channel_controller
+bind chiChannelController chi_channel_controller_sva u_chi_channel_controller_sva (
+    .clk(clk),
+    .reset(reset),
+    .reqValid(reqValid),
+    .reqAccepted(reqAccepted),
+    .reqCreditAvail(reqCreditAvail),
+    .rspValid(rspValid),
+    .snpValid(snpValid),
+    .datValid(datValid),
+    .memReqValid(memReqValid),
+    .memReqReady(memReqReady),
+    .memRespValid(memRespValid),
+    .otfCount(otfCount),
+    .controllerBusy(controllerBusy)
 );

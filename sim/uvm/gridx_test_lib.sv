@@ -332,7 +332,7 @@ class gridx_gc6_dvfs_test extends gridx_base_test;
 endclass
 
 
-//  HBM Memory Stress Sequence — targets addresses ABOVE LOCAL_MEM_RANGE
+//  HBM Memory Stress Sequence ? targets addresses ABOVE LOCAL_MEM_RANGE
 // This sequence programs the GPU with STR instructions that write to
 // addresses 0xA0+ (above LOCAL_MEM_RANGE=0x9F), which forces the address
 // decoder to route traffic through the mesh bridge into the 3D NoC ? HBM.
@@ -364,9 +364,9 @@ class gridx_mem_stress_seq extends uvm_sequence #(gridx_host_seq_item);
         //   r15 = thread_id (hardware-provided)
         //
         // Address regions targeted:
-        //   Pass 1: 0xA0 + tid  (160-191) — just above LOCAL_MEM_RANGE
-        //   Pass 2: 0xC0 + tid  (192-223) — deeper into HBM space
-        //   Pass 3: 0xE0 + tid  (224-255) — even deeper
+        //   Pass 1: 0xA0 + tid  (160-191) ? just above LOCAL_MEM_RANGE
+        //   Pass 2: 0xC0 + tid  (192-223) ? deeper into HBM space
+        //   Pass 3: 0xE0 + tid  (224-255) ? even deeper
         //
         `uvm_create(item)
         item.cmd_type = gridx_host_seq_item::CMD_LOAD_PROG;
@@ -411,7 +411,7 @@ class gridx_mem_stress_seq extends uvm_sequence #(gridx_host_seq_item);
         `uvm_create(item)
         item.cmd_type = gridx_host_seq_item::CMD_START;
         `uvm_send(item)
-        `uvm_info("STRESS_SEQ", "Kernel launched — expecting 96 HBM STR transactions (3 passes x 32 threads)", UVM_LOW)
+        `uvm_info("STRESS_SEQ", "Kernel launched ? expecting 96 HBM STR transactions (3 passes x 32 threads)", UVM_LOW)
         
         // (Verification is handled by hardware valid-chain instrumentation in tb_uvm_top.sv)
     endtask

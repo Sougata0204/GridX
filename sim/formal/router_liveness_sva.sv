@@ -33,8 +33,8 @@ endmodule
 
 // Bind statement to attach SVA module to the RTL
 bind mem_mesh_router router_liveness_sva sva_bind (
-    .clk(clk),
-    .rst_n(rst_n),
+    .clkSys(clk),
+    .rstN(rst_n),
     .flit_in(flit_in),
     .flit_in_valid(flit_in_valid),
     .flit_out(flit_out),

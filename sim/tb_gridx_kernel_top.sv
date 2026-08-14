@@ -2,10 +2,10 @@
 `timescale 1ns/1ns
 
 // GridX3 Kernel Top - Unified Self-Contained Testbench
-// Tests the full 3D GPU stack: cores → mesh NoC → HBM
-// Parameterized to match any configuration of gridx_kernel_top.
+// Tests the full 3D GPU stack: cores ? mesh NoC ? HBM
+// Parameterized to match any configuration of gridxKernelTop.
 
-module tb_gridx_kernel_top;
+module tb_gridxKernelTop;
 
     // Configurable test parameters
     localparam TIMEOUT        = 200_000;
@@ -208,8 +208,8 @@ module tb_gridx_kernel_top;
     // VCD Dump
     initial begin
         if ($test$plusargs("vcd")) begin
-            $dumpfile("gridx_kernel_top.vcd");
-            $dumpvars(0, tb_gridx_kernel_top);
+            $dumpfile("gridxKernelTop.vcd");
+            $dumpvars(0, tb_gridxKernelTop);
         end
     end
 

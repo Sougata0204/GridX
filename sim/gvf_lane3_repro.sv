@@ -33,21 +33,21 @@ module gvf_lane3_repro;
     reg [DATA_BITS-1:0] dmem_wr_data=0;
     wire [DATA_BITS-1:0] dmem_rd_data;
 
-    gridx_kernel_top #(
+    gridxKernelTop #(
         .CUBE_X(1), .CUBE_Y(1), .CUBE_Z(1), // 1 core only
         .PMEM_DEPTH(PMEM_DEPTH), .DMEM_DEPTH(DMEM_DEPTH),
         .SIM_TIMEOUT_CYCLES(TIMEOUT)
     ) dut (
-        .clk_sys(clk), .rst_n(rst_n),
-        .host_wr_en(host_wr_en), .host_wr_data(host_wr_data), .host_start(host_start),
-        .kernel_done(kernel_done), .kernel_fault(kernel_fault), .kernel_state_o(kernel_state),
-        .perf_hbm_reads(perf_hbm_reads), .perf_hbm_writes(perf_hbm_writes),
-        .perf_total_flits(perf_total_flits), .perf_cycle_count(perf_cycle_count),
-        .perf_active_cores(perf_active_cores),
-        .dbg_core_done_sample(dbg_core_done_sample), .dbg_mesh_busy(dbg_mesh_busy),
-        .pmem_wr_en(pmem_wr_en), .pmem_wr_addr(pmem_wr_addr), .pmem_wr_data(pmem_wr_data),
-        .dmem_wr_en(dmem_wr_en), .dmem_wr_addr(dmem_wr_addr), .dmem_wr_data(dmem_wr_data),
-        .dmem_rd_en(dmem_rd_en), .dmem_rd_addr(dmem_rd_addr), .dmem_rd_data(dmem_rd_data)
+        .clkSys(clk), .rstN(rst_n),
+        .hostWrEn(host_wr_en), .hostWrData(host_wr_data), .hostStart(host_start),
+        .kernelDone(kernel_done), .kernelFault(kernel_fault), .kernelStateO(kernel_state),
+        .perfHbmReads(perf_hbm_reads), .perfHbmWrites(perf_hbm_writes),
+        .perfTotalFlits(perf_total_flits), .perfCycleCount(perf_cycle_count),
+        .perfActiveCores(perf_active_cores),
+        .dbgCoreDoneSample(dbg_core_done_sample), .dbgMeshBusy(dbg_mesh_busy),
+        .pmemWrEn(pmem_wr_en), .pmemWrAddr(pmem_wr_addr), .pmemWrData(pmem_wr_data),
+        .dmemWrEn(dmem_wr_en), .dmemWrAddr(dmem_wr_addr), .dmemWrData(dmem_wr_data),
+        .dmemRdEn(dmem_rd_en), .dmemRdAddr(dmem_rd_addr), .dmemRdData(dmem_rd_data)
     );
 
     function [15:0] enc_const(input [3:0] rd, input [7:0] imm);
@@ -127,6 +127,7 @@ module gvf_lane3_repro;
                 read_dmem({12'b0, BRAM_IDX} + tid);
                 got = dmem_rd_data;
                 expected = (tid + 5) & 8'hFF;
+                if (got == expected)
                     $display("  [PASS] thread %0d: DMEM[%0d] = 0x%02h (expected 0x%02h)", tid, BRAM_IDX+tid, got, expected);
                 else
                     $display("  [FAIL] thread %0d: DMEM[%0d] = 0x%02h (expected 0x%02h)", tid, BRAM_IDX+tid, got, expected);

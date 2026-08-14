@@ -1,7 +1,7 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-import gridx_config_pkg::*;
+import gridxConfigPkg::*;
 
 module tb_gridx_v2;
 
@@ -29,7 +29,7 @@ module tb_gridx_v2;
         .DUMP_END(1000000),
         .DUMP_LEVEL(2)
     ) u_vcd (
-        .clk(clk),
+        .clkSys(clk),
         .reset(reset),
         .enable(1'b1),
         .force_dump_on(force_dump_on),
@@ -70,7 +70,7 @@ module tb_gridx_v2;
         .INIT_FILE(""), 
         .LATENCY(10) // DRAM read latency
     ) u_sys_mem (
-        .clk(clk),
+        .clkSys(clk),
         .reset(reset),
         .rd_valid(sys_rd_valid),
         .rd_addr(sys_addr),
@@ -120,7 +120,7 @@ module tb_gridx_v2;
         .INIT_FILE(""),
         .LATENCY(5) // Lower latency for HBM
     ) u_hbm_stack0 (
-        .clk(clk),
+        .clkSys(clk),
         .reset(reset),
         .rd_valid(hbm0_rd_valid),
         .rd_addr(hbm0_addr),
@@ -160,7 +160,7 @@ module tb_gridx_v2;
         .INIT_FILE(""),
         .LATENCY(5)
     ) u_hbm_stack1 (
-        .clk(clk),
+        .clkSys(clk),
         .reset(reset),
         .rd_valid(hbm1_rd_valid),
         .rd_addr(hbm1_addr),
@@ -237,7 +237,7 @@ module tb_gridx_v2;
         .TSV_DATA_WIDTH(CFG_TSV_DATA_WIDTH),
         .NUM_HBM_NODES(CFG_NUM_HBM_NODES)
     ) dut_base_die (
-        .clk(clk),
+        .clkSys(clk),
         .reset(reset),
         
         .tsv_rx_valid(tsv_rx_valid),
@@ -411,9 +411,9 @@ module tb_gridx_v2;
         $display("  Fault:  %0b (Expected: 0)", translate_fault);
         
         if (translate_paddr == 40'h0000_9abc_d678 && !translate_fault) begin
-            $display("✓ Phase 1 MMU Translation Walk PASSED.");
+            $display("? Phase 1 MMU Translation Walk PASSED.");
         end else begin
-            $display("✗ Phase 1 MMU Translation Walk FAILED.");
+            $display("? Phase 1 MMU Translation Walk FAILED.");
             $finish;
         end
         
@@ -429,9 +429,9 @@ module tb_gridx_v2;
         if (translate_ready) begin
             $display("[%0t] TLB Translation completed in 1 cycle (Hit).", $time);
             $display("  Paddr:  40'h%h (Expected: 40'h0000_9abc_d678)", translate_paddr);
-            $display("✓ Phase 1 TLB Hit test PASSED.");
+            $display("? Phase 1 TLB Hit test PASSED.");
         end else begin
-            $display("✗ Phase 1 TLB Hit test FAILED (missed or took multiple cycles).");
+            $display("? Phase 1 TLB Hit test FAILED (missed or took multiple cycles).");
             $finish;
         end
         
@@ -464,9 +464,9 @@ module tb_gridx_v2;
         // 256'h0000_0004_0000_0003_0000_0002_0000_0001 + 256'h0000_0008_0000_0007_0000_0006_0000_0005
         // 256'h0000_000c_0000_000a_0000_0008_0000_0006
         if (nmc_result_data[0] == 256'h0000_000c_0000_000a_0000_0008_0000_0006) begin
-            $display("✓ Phase 2 NMC Reduction PASSED.");
+            $display("? Phase 2 NMC Reduction PASSED.");
         end else begin
-            $display("✗ Phase 2 NMC Reduction FAILED.");
+            $display("? Phase 2 NMC Reduction FAILED.");
             $finish;
         end
         
@@ -569,7 +569,7 @@ module tb_gridx_v2;
         // Wait for graph completion
         wait(hcp_graph_done);
         $display("[%0t] HCP Task Graph Finished successfully.", $time);
-        $display("✓ Phase 3 HCP Task Graph PASSED.");
+        $display("? Phase 3 HCP Task Graph PASSED.");
         
         $display("[TB_GRIDX_V2] RESULT: ALL TESTS PASSED SUCCESSFULLY!");
         #100;

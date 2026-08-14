@@ -3,20 +3,13 @@
 
 import gridx_mem_pkg::*;
 
-typedef struct packed {
-    logic [ADDR_WIDTH-1:0]  addr;
-    logic [DATA_WIDTH-1:0]  data;
-    logic [TX_ID_W-1:0]     tx_id;
-    logic                   is_store;
-} l2_req_t;
-
-typedef struct packed {
-    logic [DATA_WIDTH-1:0]  data;
-    logic [TX_ID_W-1:0]     tx_id;
-    logic                   error;
-} l2_resp_t;
-
-module mem_mesh_endpoint_ni (
+module mem_mesh_endpoint_ni #(
+    parameter int DEST_ADDR_X_HI = 0,
+    parameter int DEST_ADDR_X_LO = 0,
+    parameter int DEST_ADDR_Y_HI = 0,
+    parameter int DEST_ADDR_Y_LO = 0,
+    parameter int DEST_Z_DEFAULT = 0
+)(
     input  logic clk,
     input  logic rst_n,
 

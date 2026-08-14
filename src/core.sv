@@ -364,6 +364,9 @@ module core #(
     wire coalescedReqValid;
     wire [DATA_MEM_ADDR_BITS-1:0] coalescedReqAddr;
     wire [THREADS_PER_BLOCK-1:0] coalescerGrant;
+    /*
+    // [ORPHANED] loadCoalescer is currently scaffolded but disconnected.
+    // Real memory requests bypass this and go directly through reqArbiterGrant/lsuPending.
     loadCoalescer #(
         .LANES(THREADS_PER_BLOCK),
         .ADDR_WIDTH(DATA_MEM_ADDR_BITS)
@@ -386,6 +389,7 @@ module core #(
         .perfUncoalescedRequests(),
         .perfBytesSaved()
     );
+    */
     
     always @(posedge clk) begin
         if (reset) begin
@@ -404,6 +408,21 @@ module core #(
         end
     end
 
+    wire l1Hit = (arbAddr >= 16'h2000 && arbAddr < 16'h8000);
+    // Face hit: address bits [21:19] select face direction (1-6), 0 = normal BRAM path
+    wire [2:0] arbFaceSel = arbAddr[21:19];
+    wire faceHit = (arbFaceSel >= 3'd1) && (arbFaceSel <= 3'd6);
+    wire l1ReadReady, l1WriteReady;
+    wire [DATA_MEM_DATA_BITS-1:0] l1ReadData;
+
+    wire storeCombinerReady;
+    wire [5:0] fcCoreReqReady;
+    
+    wire arbMemReady = 
+        l1Hit ? (arbWrite ? l1WriteReady : l1ReadReady) :
+        faceHit ? fcCoreReqReady[(arbFaceSel >= 3'd1 && arbFaceSel <= 3'd6) ? (arbFaceSel - 3'd1) : 3'd0] :
+        (arbWrite ? storeCombinerReady : rbOutValid);
+
     lsuArbiter #(
         .NUM_REQUESTERS(THREADS_PER_BLOCK),
         .ADDR_WIDTH(DATA_MEM_ADDR_BITS),
@@ -419,7 +438,7 @@ module core #(
         .memWrite(arbWrite),
         .memAddr(arbAddr),
         .memData(arbData),
-        .memReady(1'b1),
+        .memReady(arbMemReady),
         .grant(reqArbiterGrant)
     );
     
@@ -442,12 +461,7 @@ module core #(
         .memReady(rbOutValid || memWriteReady || l1ReadReady || l1WriteReady),
         .grant(respArbiterGrant)
     );
-    wire l1Hit = (arbAddr >= 16'h2000 && arbAddr < 16'h8000);
-    // Face hit: address bits [21:19] select face direction (1-6), 0 = normal BRAM path
-    wire [2:0] arbFaceSel = arbAddr[21:19];
-    wire faceHit = (arbFaceSel >= 3'd1) && (arbFaceSel <= 3'd6);
-    wire l1ReadReady, l1WriteReady;
-    wire [DATA_MEM_DATA_BITS-1:0] l1ReadData;
+    // l1Hit, faceHit, l1ReadReady, l1WriteReady moved up
     coreLocalMemory #(
         .ADDR_WIDTH(15),
         .DATA_WIDTH(DATA_MEM_DATA_BITS)
@@ -474,7 +488,7 @@ module core #(
         .storeValid(arbValid && arbWrite && !l1Hit && !faceHit),
         .storeAddr(arbAddr),
         .storeData(arbData),
-        .storeReady(),
+        .storeReady(storeCombinerReady),
         .combinedValid(memWriteValid),
         .combinedAddr(memWriteAddress),
         .combinedData(memWriteData),
@@ -784,7 +798,6 @@ module core #(
     wire faceArbValid = arbValid && !l1Hit && faceHit;
     wire faceArbWrite = arbWrite;
     wire [5:0] fcCoreReqValid;
-    wire [5:0] fcCoreReqReady;
     wire [5:0] fcCoreRespValid;
     wire [5:0][DATA_MEM_DATA_BITS-1:0] fcCoreRespRdata;
     genvar f;

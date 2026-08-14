@@ -1,0 +1,16 @@
+[tasks]
+prove
+
+[options]
+prove: mode prove
+prove: depth 50
+
+[engines]
+prove: smtbmc boolector
+
+[script]
+read -formal mem_mesh_arbiter.sv
+prep -top mem_mesh_arbiter
+
+[files]
+../memory_mesh/src/mem_mesh_arbiter.sv

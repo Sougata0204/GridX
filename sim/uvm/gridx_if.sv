@@ -6,7 +6,7 @@
 
 `include "../../src/axi4_if.sv"
 
-// Host command interface — drives configuration, program loading, and kernel launch
+// Host command interface ? drives configuration, program loading, and kernel launch
 
 
 interface gridx_host_if #(
@@ -62,7 +62,7 @@ interface gridx_host_if #(
 endinterface
 
 
-// Kernel status interface — passive observation of DUT outputs
+// Kernel status interface ? passive observation of DUT outputs
 interface gridx_kernel_status_if (
     input wire clk,
     input wire rst_n

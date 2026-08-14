@@ -75,7 +75,7 @@ class gridx_host_seq_item extends uvm_sequence_item;
 endclass
 
 
-// Memory scoreboard entry — used by scoreboard to track expected vs actual
+// Memory scoreboard entry ? used by scoreboard to track expected vs actual
 class gridx_mem_transaction extends uvm_sequence_item;
 
     logic [21:0] addr;

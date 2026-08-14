@@ -53,7 +53,7 @@ module tb_gridx_top;
     wire [7:0] dmem_rd_data;
 
     // DUT INSTANTIATION
-    gridx_kernel_top #(
+    gridxKernelTop #(
         .PMEM_DEPTH        (PMEM_DEPTH),
         .DMEM_DEPTH        (DMEM_DEPTH),
         .SIM_TIMEOUT_CYCLES(TIMEOUT)
@@ -65,13 +65,13 @@ module tb_gridx_top;
         .host_start    (host_start),
         .kernel_done   (kernel_done),
         .kernel_fault  (kernel_fault),
-        .kernel_state_o(kernel_state),
+        .kernelStateO(kernel_state),
         .perf_hbm_reads   (perf_hbm_reads),
         .perf_hbm_writes  (perf_hbm_writes),
         .perf_total_flits (perf_total_flits),
         .perf_cycle_count (perf_cycle_count),
-        .perf_active_cores(perf_active_cores),
-        .dbg_core_done_sample(dbg_core_done_sample),
+        .perfActiveCores(perf_active_cores),
+        .dbgCoreDoneSample(dbg_core_done_sample),
         .dbg_mesh_busy (dbg_mesh_busy),
         .pmem_wr_en    (pmem_wr_en),
         .pmem_wr_addr  (pmem_wr_addr),
@@ -186,18 +186,18 @@ module tb_gridx_top;
     // TEST SUITE
     initial begin
         $display("");
-        $display("╔══════════════════════════════════════════════════════════╗");
-        $display("║       GridX³ — 3D GPU SoC Unified Test Suite           ║");
-        $display("║  Architecture: %0d×%0d×%0d = %0d cores",
+        $display("????????????????????????????????????????????????????????????");
+        $display("?       GridX? ? 3D GPU SoC Unified Test Suite           ?");
+        $display("?  Architecture: %0d?%0d?%0d = %0d cores",
                  dut.CUBE_X, dut.CUBE_Y, dut.CUBE_Z, dut.NUM_CORES);
-        $display("║  Threads/Block: %0d | Warps/Core: %0d",
+        $display("?  Threads/Block: %0d | Warps/Core: %0d",
                  dut.THREADS_PER_BLOCK, dut.WARPS_PER_CORE);
-        $display("╚══════════════════════════════════════════════════════════╝");
+        $display("????????????????????????????????????????????????????????????");
         $display("");
 
         // TEST 1: Reset & Init
         test_num = 1;
-        $display("── Test %0d: Reset & Init ──", test_num);
+        $display("?? Test %0d: Reset & Init ??", test_num);
         do_reset();
         report(kernel_state == 3'd0, "kernel_state = RESET after reset");
         report(!kernel_done,         "kernel_done = 0 after reset");
@@ -207,14 +207,14 @@ module tb_gridx_top;
 
         // TEST 2: DCR Configuration
         test_num = 2;
-        $display("── Test %0d: DCR Configuration ──", test_num);
+        $display("?? Test %0d: DCR Configuration ??", test_num);
         write_dcr_word(16'd4);  // 4 threads = 1 block
         repeat (5) @(posedge clk);
         report(kernel_state == 3'd1, "kernel_state = CONFIGURED after DCR");
 
         // TEST 3: SAXPY Kernel Execution
         test_num = 3;
-        $display("── Test %0d: SAXPY Kernel (4 threads) ──", test_num);
+        $display("?? Test %0d: SAXPY Kernel (4 threads) ??", test_num);
         do_reset();
         load_saxpy_kernel();
         write_dcr_word(16'd4);
@@ -231,14 +231,14 @@ module tb_gridx_top;
 
         // TEST 4: Data Memory Readback
         test_num = 4;
-        $display("── Test %0d: Data Memory Readback ──", test_num);
+        $display("?? Test %0d: Data Memory Readback ??", test_num);
         read_dmem_byte(22'd0);
         $display("    DMEM[0] = 0x%02h", dmem_rd_data);
         // Just verify it's not X (proper driver exists)
 
         // TEST 5: Multi-Block Dispatch (8 threads = 2 blocks)
         test_num = 5;
-        $display("── Test %0d: Multi-Block Dispatch (8 threads) ──", test_num);
+        $display("?? Test %0d: Multi-Block Dispatch (8 threads) ??", test_num);
         do_reset();
         load_saxpy_kernel();
         write_dcr_word(16'd8);  // 8 threads = 2 blocks of 4
@@ -254,13 +254,13 @@ module tb_gridx_top;
 
         // FINAL SUMMARY
         $display("");
-        $display("╔══════════════════════════════════════════════════════════╗");
+        $display("????????????????????????????????????????????????????????????");
         if (tests_failed == 0) begin
-            $display("║  ✓ ALL %0d TESTS PASSED", tests_passed);
+            $display("?  ? ALL %0d TESTS PASSED", tests_passed);
         end else begin
-            $display("║  ✗ %0d PASSED, %0d FAILED", tests_passed, tests_failed);
+            $display("?  ? %0d PASSED, %0d FAILED", tests_passed, tests_failed);
         end
-        $display("╚══════════════════════════════════════════════════════════╝");
+        $display("????????????????????????????????????????????????????????????");
         $display("");
 
         repeat (10) @(posedge clk);

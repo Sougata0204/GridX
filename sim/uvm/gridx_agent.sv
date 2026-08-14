@@ -4,7 +4,7 @@
 `ifndef GRIDX_AGENT_SV
 `define GRIDX_AGENT_SV
 
-// Host Agent — active agent with driver + sequencer + monitor
+// Host Agent ? active agent with driver + sequencer + monitor
 class gridx_host_agent extends uvm_agent;
 
     gridx_host_driver                        m_driver;
@@ -37,7 +37,7 @@ class gridx_host_agent extends uvm_agent;
 endclass
 
 
-// Kernel Status Agent — passive agent (monitor only, no driver)
+// Kernel Status Agent ? passive agent (monitor only, no driver)
 class gridx_kernel_agent extends uvm_agent;
 
     gridx_kernel_monitor m_monitor;
@@ -50,7 +50,7 @@ class gridx_kernel_agent extends uvm_agent;
 
     virtual function void build_phase(uvm_phase phase);
         super.build_phase(phase);
-        // Always passive — kernel status is read-only
+        // Always passive ? kernel status is read-only
         m_monitor = gridx_kernel_monitor::type_id::create("m_monitor", this);
     endfunction
 endclass
