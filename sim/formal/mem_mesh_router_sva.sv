@@ -5,18 +5,18 @@
 import gridx_mem_pkg::*;
 
 module mem_mesh_router_sva (
-    input logic clk,
-    input logic rst_n,
+    input wire logic clk,
+    input wire logic rst_n,
 
-    input coord_t my_coord,
+    input wire coord_t my_coord,
 
-    input flit_t   [NUM_PORTS-1:0] flit_in,
-    input logic    [NUM_PORTS-1:0] flit_in_valid,
-    input credit_t [NUM_PORTS-1:0] credit_out,
+    input wire flit_t   [NUM_PORTS-1:0] flit_in,
+    input wire logic    [NUM_PORTS-1:0] flit_in_valid,
+    input wire credit_t [NUM_PORTS-1:0] credit_out,
 
-    input flit_t   [NUM_PORTS-1:0] flit_out,
-    input logic    [NUM_PORTS-1:0] flit_out_valid,
-    input credit_t [NUM_PORTS-1:0] credit_in
+    input wire flit_t   [NUM_PORTS-1:0] flit_out,
+    input wire logic    [NUM_PORTS-1:0] flit_out_valid,
+    input wire credit_t [NUM_PORTS-1:0] credit_in
 );
 
     // 1. Credit Underflow & Overflow Checks

@@ -1,6 +1,16 @@
 `default_nettype none
 `timescale 1ns/1ns
 
+`include "formal/async_fifo_sva.sv"
+`include "formal/axi4_hbm_bridge_sva.sv"
+`include "formal/chi_channel_controller_sva.sv"
+`include "formal/credit_manager_sva.sv"
+`include "formal/directory_controller_sva.sv"
+`include "formal/mem_mesh_router_sva.sv"
+`include "formal/router_liveness_sva.sv"
+`include "formal/simt_stack_sva.sv"
+`include "formal/gridx_formal_bind.sv"
+
 module gvf_2d;
 
     localparam CONFIG_LABEL      = "2D-SLICE (2x2x1)";

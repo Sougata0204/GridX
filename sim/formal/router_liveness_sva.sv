@@ -6,11 +6,11 @@ import gridx_mem_pkg::*;
 module router_liveness_sva (
     input wire clk,
     input wire rst_n,
-    input flit_t   [NUM_PORTS-1:0] flit_in,
-    input logic    [NUM_PORTS-1:0] flit_in_valid,
-    input flit_t   [NUM_PORTS-1:0] flit_out,
-    input logic    [NUM_PORTS-1:0] flit_out_valid,
-    input logic  [NUM_PORTS-1:0][NUM_VCS-1:0][$clog2(FLITS_PER_BUFFER):0] fifo_count
+    input wire flit_t   [NUM_PORTS-1:0] flit_in,
+    input wire logic    [NUM_PORTS-1:0] flit_in_valid,
+    input wire flit_t   [NUM_PORTS-1:0] flit_out,
+    input wire logic    [NUM_PORTS-1:0] flit_out_valid,
+    input wire logic  [NUM_PORTS-1:0][NUM_VCS-1:0][$clog2(FLITS_PER_BUFFER):0] fifo_count
 );
 
     // 1. Packet Liveness: If a buffer is not empty, a flit should eventually leave this router
@@ -33,8 +33,8 @@ endmodule
 
 // Bind statement to attach SVA module to the RTL
 bind mem_mesh_router router_liveness_sva sva_bind (
-    .clkSys(clk),
-    .rstN(rst_n),
+    .clk(clk),
+    .rst_n(rst_n),
     .flit_in(flit_in),
     .flit_in_valid(flit_in_valid),
     .flit_out(flit_out),

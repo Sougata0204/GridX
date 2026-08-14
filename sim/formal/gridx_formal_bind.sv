@@ -3,6 +3,8 @@
 
 `timescale 1ns/1ns
 
+module gridx_formal_bind;
+
 // Bind SVA to mem_mesh_router
 bind mem_mesh_router mem_mesh_router_sva u_mem_mesh_router_sva (
     .clk(clk),
@@ -121,3 +123,5 @@ bind chiChannelController chi_channel_controller_sva u_chi_channel_controller_sv
     .otfCount(otfCount),
     .controllerBusy(controllerBusy)
 );
+
+endmodule
