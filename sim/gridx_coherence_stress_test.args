@@ -1,0 +1,1 @@
+sim_uvm -testplusarg UVM_TESTNAME=gridx_coherence_stress_test -testplusarg UVM_VERBOSITY=UVM_LOW -R -log logs/gridx_coherence_stress_test.log

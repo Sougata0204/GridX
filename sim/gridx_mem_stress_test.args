@@ -1,0 +1,1 @@
+sim_uvm -testplusarg UVM_TESTNAME=gridx_mem_stress_test -testplusarg UVM_VERBOSITY=UVM_LOW -R -log logs/gridx_mem_stress_test.log

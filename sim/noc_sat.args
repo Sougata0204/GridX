@@ -1,0 +1,1 @@
+sim_uvm -testplusarg UVM_TESTNAME=gridx_noc_saturation_test -testplusarg UVM_VERBOSITY=UVM_LOW -R -log logs\noc_saturation.log

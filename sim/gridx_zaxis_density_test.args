@@ -1,0 +1,1 @@
+sim_uvm -testplusarg UVM_TESTNAME=gridx_zaxis_density_test -testplusarg UVM_VERBOSITY=UVM_LOW -R -log logs/gridx_zaxis_density_test.log

@@ -1,0 +1,3 @@
+-R
+-testplusarg
+UVM_TESTNAME=gridx_multicore_perf_test

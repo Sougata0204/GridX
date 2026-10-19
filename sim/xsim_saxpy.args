@@ -1,0 +1,9 @@
+sim_uvm
+--testplusarg
+UVM_TESTNAME=gridx_saxpy_test
+--testplusarg
+UVM_VERBOSITY=UVM_LOW
+--tclbatch
+run_saxpy_batch.tcl
+--log
+logs/saxpy_run.log

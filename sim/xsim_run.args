@@ -1,0 +1,1 @@
+sim_uvm -testplusarg UVM_TESTNAME=gridx_multicore_perf_test -testplusarg UVM_VERBOSITY=UVM_LOW -t xsim_vcd_commands.tcl -wdb "D:/ML_DL_AI/GridX_Vivado/gridx3_sim.wdb" -log "D:/ML_DL_AI/GridX_Vivado/GridX/sim/logs/vcd_simulation.log"

@@ -1,0 +1,2 @@
+-testplusarg UVM_TESTNAME=gridx_zlink_benchmark_test
+-testplusarg UVM_VERBOSITY=UVM_LOW

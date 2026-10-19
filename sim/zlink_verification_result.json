@@ -1,0 +1,22 @@
+{
+  "test": "TEST_ZLINK_BENCHMARK_45_6",
+  "expected_z_plus_flits": 45,
+  "observed_z_plus_flits": 48,
+  "dut_z_plus_flits": 48,
+  "expected_z_minus_flits": 6,
+  "observed_z_minus_flits": 10,
+  "dut_z_minus_flits": 10,
+  "generated": 45,
+  "accepted": 48,
+  "delivered": 48,
+  "completed": 48,
+  "dropped": 0,
+  "duplicates": 0,
+  "corruptions": 0,
+  "fsm_errors": 0,
+  "handshake_errors": 0,
+  "x_errors": 0,
+  "timeouts": 0,
+  "deadlocks": 0,
+  "result": "PASS"
+}

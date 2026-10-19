@@ -1,0 +1,1 @@
+sim_uvm -testplusarg UVM_TESTNAME=gridx_gc6_dvfs_test -testplusarg UVM_VERBOSITY=UVM_LOW -R -log logs/gridx_gc6_dvfs_test.log
